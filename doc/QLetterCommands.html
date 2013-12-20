@@ -1,0 +1,244 @@
+
+
+<h2>QLetterCommands</h2>
+
+<h3>command = qmstrings::vprof</h3>
+
+data = lat:lon<br>
+
+Starter vprof-vinduet hvis nødvendig.<br>
+Viser sondering i punktet lat:lon<br>
+
+
+
+<h3>command = qmstrings::addimage</h3>
+(obsolete: description name:image)<br>
+
+<p>
+description = name:image<br>
+Flere bilder kan sendes i et brev
+</p>
+
+<h3>command = qmstrings::positions</h3>
+<p><b>Må ha:</b><br>
+commondesc = dataset<br>
+description = name:lat:lon<br>
+</p>
+<p><b>Kan ha:</b><br>
+commondesc = dataset:image:normal:selected:icon:annotation<br>
+description = name:lat:lon:image<br>
+</p>
+<p>Rekkefølgen er likegyldig<br>
+</p>
+<p>Common:<br>
+  dataset    - navnet på datasetet<br>
+  image      - felles bilde for alle posisjoner<br>
+  normal     - true:navnet på posisjonen vises<br>
+  selected   - true:navnet på posisjonen vises når den er valgt<br>
+  icon       - frimerke til statuslinjen<br>
+  annotation - annotasjonstekst
+</p>
+
+
+<h3>command = qmstrings::showpositions</h3>
+commondesc = dataset
+
+<h3>command = qmstrings::hidepositions</h3>
+commondesc = dataset
+
+<h3>command = qmstrings::showpositionname</h3>
+commondesc = dataset:normal:selected<br>
+
+<h3>command = qmstrings::showtext</h3>
+commondesc = text<br>
+
+<h3>command = qmstrings::enableshowtext</h3>
+commondesc = dataset:on/off<br>
+
+<h3>command = qmstrings::changeimageandtext</h3>
+common=dataSet<br>
+<b>eksempler:</b><br>
+description=name:image<br>
+description=name:image:text:alignment<br>
+description=name:image:image2<br>
+description=name:dd:ff<br>
+
+<h3>command = qmstrings::seteditpositions</h3>
+commondesc = dataset<br>
+description = name<br>
+
+<h3>command = qmstrings::editposition</h3>
+commondesc = dataset<br>
+description = name,value_1/value_2/value_3<br>
+
+<h3>command = qmstrings::areas</h3>
+commondesc = dataset<br>
+description = areastring<br>
+data[0] = streng som inneholder alle områder<br>
+
+<h3>command = qmstrings::areacommand</h3>
+generell, skal kunne brukes til det meste
+commondesc = command
+description = data<br>
+
+<h3>command = qmstrings::show_area (or hide)</h3>
+description = name:on/off<br>
+
+<h3>command = qmstrings::select_area</h3>
+description = name,on/off<br>
+
+<h3>command = qmstrings::change_area</h3>
+description = name:colour/pattern<br>
+
+<h3>command = qmstrings::delete_area</h3>
+description = name<br>
+
+<h3>command = qmstrings::changetype</h3>
+
+
+<h3>command = qmstrings::autoredraw</h3>
+common = true/false<br>
+
+<h3>command = qmstrings::redraw</h3>
+
+<h3>command = qmstrings::sendkey</h3>
+commondesc =  "key"
+common     =   Ex:"ctrl_S", "alt_F8", "shift_Y", "A")
+
+<h3>command = qmstrings::settime</h3>
+<b>Enten:</b><br>
+commondesc = datatype <br>
+description = time <br>
+Setter tidene i tidsslideren<br>
+<br>
+<b>Eller:</b><br>
+commondesc = time <br>
+Setter tidsslideren til "time"
+
+<h3>command = qmstrings::timechanged</h3>
+commondesc = time <br>
+Setter tidsslideren til "time"
+
+<h3>command = qmstrings::removeclient</h3>
+commondesc = id:dataaset<br>
+Kommer fra coserver<br>
+
+<h3>command = qmstrings::newclient</h3>
+commondesc = id:dataaset<br>
+Kommer fra coserver<br>
+
+<h3>command = qmstrings::apply_quickmenu</h3>
+data[0]=menu<br>
+data[1]=item<br>
+
+<h3>command = qmstrings::remove</h3>
+Sendes fra QMessageClient, men brukes ikke
+
+<br>
+<br>
+
+<b>command = qmstrings::station</b><br>
+<b>command = qmstrings::init_HQC_params</b><br>
+<b>command = qmstrings::update_HQC_params</b><br>
+<b>command = qmstrings::select_HQC_param</b><br>
+<br>
+<b>command = qmstrings::allclients</b>    <br>
+    ikke i bruk<br>
+<b>command = qmstrings::enableposclick</b>  <br>
+  ikke i bruk<br>
+<b>command = qmstrings::enableposmove</b> <br>
+    ikke i bruk<br>
+<b>command = qmstrings::changeimageandimage</b> <br>
+   Obsolete<br>
+<b>command = qmstrings::changeimage</b><br>
+           Obsolete<br>
+<b>command = qmstrings::textrequest</b><br>
+            obsolete<br>
+
+<b>to = qmstrings::all</b><br>
+    sende brev til alle
+
+
+<h2>Eksempler</h2>
+
+<h3>qmstrings::addimage</h3>
+
+SENDING:<br>
+	
+  QImage image(filename);<br>
+  QByteArray a;<br>
+  QDataStream s(a, IO_WriteOnly);<br>
+  s << image;<br>
+
+  miMessage m;<br>
+  m.command= qmstrings::addimage;<br>
+  m.commondesc  = "name";<br>
+  m.common = name;<br>
+  m.description = "image";<br>
+
+  ostringstream ost;<br>
+
+  int n= a.count();<br>
+  for (int i=0; i<n; i++)<br>
+    ost << setw(7) << int(a[i]);<br>
+  miString txt= ost.str();<br>
+  m.data.push_back(txt);<br>
+
+  pluginB->sendMessage(m);<br>
+
+<br>
+RECEIVING:<br>
+
+  vector<miString> vvs= data[0].split(" ");<br>
+  int n= vvs.size();<br>
+  QByteArray a(n);<br>
+  for (int i=0; i<n; i++)<br>
+    a[i]= char(atoi(vvs[i].cStr()));<br>
+
+  QDataStream s( a, IO_ReadOnly );  // open on a's data<br>
+  QImage image;<br>
+  s >> image;                       // read raw bindata<br>
+  QtImageGallery ig;<br>
+  ig.addImageToGallery(name, image);<br>
+
+<br>
+<br>
+<br>
+
+
+<h2> How to get started:</h2>
+
+
+<b>Må inkluderes:</b><br>
+qtClientButton.h<br>
+miMessage.h<br>
+QLetterCommands.h<br>
+<br>
+
+<b> Lage knapp:</b><br>
+
+ClientButton *pluginB;<br>
+pluginB = new ClientButton("Diana",server.c_str(),statusBar());<br>
+connect(pluginB, SIGNAL(receivedLetter(miMessage&)),<br>
+	SLOT(processLetter(miMessage&)));<br>
+connect(pluginB, SIGNAL(connectionClosed()),SLOT(connectionClosed()));<br>
+
+<b> Label som viser hvem som er koblet til:</b><br>
+pluginB->useLabel(true);</b><br> 
+<b> Koble til:</b><br>
+pluginB->openConnection(); <br>
+
+<br>
+<br>
+<b>miMessage</b><br>
+class miMessage{<br>
+miString command; <br>
+miString commondesc;  //beskriver common<br>
+miString common;      //ting som er felles for alle dataene<br>
+miString description; //beskriver data<br>
+vector<miString> data;<br>
+miString dataType;    //ikke i bruk<br>
+miString co;          //ikke i bruk<br>
+int to;               //mottakers id<br>
+int from;             //senders id<br>
+};

@@ -1,0 +1,61 @@
+
+#include "QLetterCommands.h"
+
+namespace qmstrings{
+extern const char vprof[]               = "vprof";
+extern const char vcross[]              = "vcross";
+extern const char addimage[]            = "addimage";
+extern const char positions[]           = "positions";
+extern const char showpositions[]       = "showpositions";
+extern const char hidepositions[]       = "hidepositions";
+extern const char changeimage[]         = "changeimage";
+extern const char showpositionname[]    = "showpositionname";
+extern const char showpositiontext[]    = "showpositiontext";
+extern const char enableposclick[]      = "enableposclick";
+extern const char enableposmove[]       = "enableposmove";
+extern const char showtext[]            = "showtext";
+extern const char enableshowtext[]      = "enableshowtext";
+extern const char textrequest[]         = "textrequest";
+extern const char selectposition[]      = "selectposition";
+extern const char settime[]             = "settime";
+extern const char remove[]              = "remove";
+extern const char removeclient[]        = "removeclient";
+extern const char newclient[]           = "newclient";
+extern const char allclients[]          = "allclients";
+extern const char timechanged[]         = "timechanged";
+extern const char init_HQC_params[]     = "init_HQC_params";
+extern const char update_HQC_params[]   = "update_HQC_params";
+extern const char select_HQC_param[]    = "select_HQC_param";
+extern const char apply_quickmenu[]     = "apply_quickmenu";
+extern const char station[]             = "station";
+extern const char changeimageandtext[]  = "change_image_and_text";
+extern const char changeimageandimage[] = "change_image_and_image";
+extern const char seteditpositions[]    = "seteditpositions";
+extern const char editposition[]        = "editposition";
+extern const char copyvalue[]           = "copyvalue";
+extern const char areas[]               = "areas";
+extern const char selectarea[]          = "selectarea";
+extern const char areacommand[]         = "areacommand";
+extern const char showarea[]            = "showarea";
+extern const char changearea[]          = "changearea";
+extern const char deletearea[]          = "deletearea";
+extern const char annotation[]          = "annotation";
+extern const char changetype[]          = "changetype";
+extern const char autoredraw[]          = "autoredraw";
+extern const char redraw[]              = "redraw";
+extern const char sendkey[]             = "sendkey";
+extern const char editmode[]            = "editmode";
+extern const char printclicked[]        = "printclicked";
+extern const char getcurrentplotcommand[] = "getcurrentplotcommand";
+extern const char currentplotcommand[]  = "currentplotcommand";
+extern const char getproj4maparea[]     = "getproj4maparea";
+extern const char proj4maparea[]        = "proj4maparea";
+extern const char getmaparea[]          = "getmaparea";
+extern const char maparea[]             = "maparea";
+extern const char directory_changed[]   = "directory_changed";
+extern const char file_changed[]        = "file_changed";
+
+extern const int default_id = -1000;
+extern const int all = -1;
+extern const int port = 19444;
+};
