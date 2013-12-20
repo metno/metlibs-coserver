@@ -7,5 +7,5 @@ Name: qUtilities
 Description: The coserver Library
 Version: @VERSION@
 Requires: miLogger >= 4.0.0
-Libs: -L${libdir} -lcoserver
-Cflags: -I${includedir}
+Libs: -L${libdir} -lcoserver @QT4_LDFLAGS@ @QT4_LIBS@
+Cflags: -I${includedir} @QT4_CPPFLAGS@
