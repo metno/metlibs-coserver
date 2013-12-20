@@ -4,8 +4,8 @@ libdir=@libdir@
 includedir=@includedir@
 
 Name: qUtilities
-Description: The qUtilities Library
+Description: The coserver Library
 Version: @VERSION@
 Requires: miLogger >= 4.0.0
-Libs: -L${libdir} -lqUtilities
+Libs: -L${libdir} -lcoserver
 Cflags: -I${includedir}
