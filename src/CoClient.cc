@@ -29,10 +29,6 @@
 // TODO: Add support for multiple servers active on different ports (on the same node)
 // TODO: Add support for multiple clients per server
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif  /* HAVE_CONFIG_H */
-
 #include "CoClient.h"
 #include "QLetterCommands.h"
 
@@ -47,32 +43,25 @@
 #endif
 
 // Qt-includes
-//#include <QtNetwork>
 #include <QtCore/QProcess>
 #include <QtCore/QStringList>
 #include <QtCore/QTimer>
 #include <QtNetwork/QTcpSocket>
 
-#ifdef HAVE_LOG4CXX   /* Defined in config.h */
-#include <log4cxx/logger.h>
-static log4cxx::LoggerPtr logger = log4cxx::Logger::getLogger("coclient.CoClient");
-#else  /* ! HAVE_LOG4CXX */
-#include <miLogger/logger.h>
-#endif /* HAVE_LOG4CXX */
+#ifdef __WIN32__
+#define METLIBS_LOG_SCOPE(x) /* emtpy */
+#define METLIBS_LOG_ERROR(x) /* emtpy */
+#define METLIBS_LOG_INFO(x)  /* emtpy */
+#define METLIBS_LOG_DEBUG(x) /* emtpy */
+#else
+#include <miLogger/miLogging.h>
+#endif /* __WIN32__ */
 
 #include <boost/algorithm/string.hpp>
 
 #include <fstream>
 #include <sstream>
 #include <unistd.h>
-
-//#define _DEBUG
-#ifdef _DEBUG
-#include <iostream>
-#define DEBUG_MSG(x) std::cerr << x << std::endl
-#else
-#define DEBUG_MSG(x)
-#endif
 
 namespace /* anonymous */ {
 std::string safe_getenv(const char* var)
@@ -160,7 +149,7 @@ CoClient::CoClient(const char *name, const char *h, const char *sc, quint16 p)
 
 CoClient::~CoClient()
 {
-    DEBUG_MSG("CoClient::~CoClient()");
+    METLIBS_LOG_SCOPE();
 }
 
 void CoClient::setBroadcastClient()
@@ -170,43 +159,43 @@ void CoClient::setBroadcastClient()
 
 int CoClient::readPortFromFile()
 {
-    DEBUG_MSG("CoClient::readPortFromFile()");
+    METLIBS_LOG_SCOPE();
     
     const std::string homePath = safe_getenv("HOME");
-    DEBUG_MSG("homePath: " << homePath);
+    METLIBS_LOG_DEBUG("homePath: " << homePath);
     
     std::ifstream pfile((homePath + "/.coserver.port").c_str());
     if (not pfile.is_open()) {
-        DEBUG_MSG("Could not read coserver.port from file");
+        METLIBS_LOG_DEBUG("Could not read coserver.port from file");
         return 0;
     }
 
     int filePort = 0;
     pfile >> filePort;
     if (not pfile) {
-        DEBUG_MSG("Could not read port number from file");
+        METLIBS_LOG_DEBUG("Could not read port number from file");
         return 0;
     }
     
-    DEBUG_MSG("Port: " << filePort << " read from file.");
+    METLIBS_LOG_DEBUG("Port: " << filePort << " read from file.");
     return filePort;
 }
 
 // etc/services: diana-<username>		<port>/tcp		# comment
 int CoClient::readPortFromFile_Services()
 {
-    DEBUG_MSG("CoClient::readPortFromFile_Services()");
+    METLIBS_LOG_SCOPE();
     
     const char filename[] = "/etc/services";
     std::ifstream file(filename);
     if (not file.is_open()) {
-        DEBUG_MSG("Could not open file '" << filename << "'");
+        METLIBS_LOG_DEBUG("Could not open file '" << filename << "'");
         return 0;
     }
     
     const char* user = getenv("USER");
     if (not user) {
-        DEBUG_MSG("Environment variable 'USER' not set.");
+        METLIBS_LOG_DEBUG("Environment variable 'USER' not set.");
         return 0;
     }
 
@@ -230,14 +219,14 @@ int CoClient::readPortFromFile_Services()
             continue;
         filePort = std::atoi(tokens2[1].c_str());
     }
-    LOG4CXX_DEBUG(logger, "Port: " << filePort << " read from '" << filename << "'");
+    METLIBS_LOG_DEBUG("Port: " << filePort << " read from '" << filename << "'");
     return filePort;
 }
 
 void CoClient::printBytesWritten(qint64 written)
 {
     (void)written;
-    LOG4CXX_DEBUG(logger, "Written " << written << " bytes to socket");
+    METLIBS_LOG_DEBUG("Written " << written << " bytes to socket");
 }
 
 bool CoClient::notConnected()
@@ -247,17 +236,18 @@ bool CoClient::notConnected()
 
 void CoClient::connectionClosed()
 {
-    LOG4CXX_DEBUG(logger, "CoClient disconnected from server");
+    METLIBS_LOG_DEBUG("CoClient disconnected from server");
     /*emit*/ disconnected();
 }
 
 void CoClient::connectToServer()
 {
+    METLIBS_LOG_SCOPE();
     if (port > 0) {
-        LOG4CXX_INFO(logger, "CoClient::connectToServer(): connecting to port " << port);
+        METLIBS_LOG_INFO("connecting to port " << port);
         tcpSocket->connectToHost(host, port);
     } else {
-        LOG4CXX_ERROR(logger, "CoClient::connectToServer(): bad port " << port);
+        METLIBS_LOG_ERROR("bad port " << port);
     }
 }
 
@@ -308,7 +298,7 @@ void CoClient::readNew()
         msg.data.push_back(tmpdata.toStdString());
     }
     
-    DEBUG_MSG("miMessage in CoClient::readNew() (RECV)" << std::endl << msg.content());
+    METLIBS_LOG_DEBUG("miMessage in CoClient::readNew() (RECV)" << std::endl << msg.content());
    
     // if origin is the server itself, then it will always be a request to
     // change (add/delete) entries in the list of clients
@@ -337,24 +327,24 @@ void CoClient::editClients(const miMessage& msg)
     if (msg.command == qmstrings::newclient) {
         clients.erase(id);
         clients[id] = type;
-        LOG4CXX_INFO(logger, "Added new client of type " << type << " and id " << id << " to the list of clients");
+        METLIBS_LOG_INFO("Added new client of type " << type << " and id " << id << " to the list of clients");
         
         /*emit*/ newClient(type);
         /*emit*/ addressListChanged();
     } else if (msg.command == qmstrings::removeclient) {
         clients.erase(id);
-        LOG4CXX_INFO(logger, "Removed client of type " << type << " and id " << id << " from the list of clients");
+        METLIBS_LOG_INFO("Removed client of type " << type << " and id " << id << " from the list of clients");
         
         /*emit*/ newClient("myself");
         /*emit*/ addressListChanged();
     } else {
-        LOG4CXX_ERROR(logger, "Error editing client list");
+        METLIBS_LOG_ERROR("Error editing client list");
     }
 }
 
 void CoClient::connectionEstablished()
 {
-    LOG4CXX_INFO(logger, "CoClient connected to server");
+    METLIBS_LOG_INFO("CoClient connected to server");
     
     miMessage msg(0, 0, "SETTYPE", "INTERNAL");
     msg.data.push_back(clientType);
@@ -384,7 +374,7 @@ bool CoClient::sendMessage(miMessage &msg)
         if(not hasReceiver)
             msg.to = -1;
         
-        DEBUG_MSG("miMessage in CoClient::sendMessage() (SEND)" << std::endl << msg.content());
+        METLIBS_LOG_DEBUG("miMessage in CoClient::sendMessage() (SEND)" << std::endl << msg.content());
 
         QByteArray block;
         QDataStream out(&block, QIODevice::WriteOnly);
@@ -402,7 +392,7 @@ bool CoClient::sendMessage(miMessage &msg)
         out << QString::fromStdString(msg.clientType);
         out << QString::fromStdString(msg.co);
         out << quint32(msg.data.size()); // NOT A FIELD IN MIMESSAGE (TEMP ONLY)
-        DEBUG_MSG("Size of data in last sent msg: " << msg.data.size());
+        METLIBS_LOG_DEBUG("Size of data in last sent msg: " << msg.data.size());
         for (unsigned int i = 0; i < msg.data.size(); i++) {
             out << QString::fromStdString(msg.data[i]);
         }
@@ -414,7 +404,7 @@ bool CoClient::sendMessage(miMessage &msg)
         tcpSocket->waitForBytesWritten(250);
         return true;
     } else {
-        LOG4CXX_ERROR(logger, "Error sending message");
+        METLIBS_LOG_ERROR("Error sending message");
         return false;
     }
 }
@@ -441,13 +431,13 @@ bool CoClient::clientTypeExist(const std::string& type)
 void CoClient::socketError(QAbstractSocket::SocketError e)
 {
     if (QAbstractSocket::ConnectionRefusedError == e) {
-        LOG4CXX_INFO(logger, "CoClient: could not connect to coserver, trying to start");
+        METLIBS_LOG_INFO("CoClient: could not connect to coserver, trying to start");
         tryToStartCoServer();
     } else if (QAbstractSocket::RemoteHostClosedError == e) {
-        LOG4CXX_INFO(logger, "CoClient: connection to coserver closed unexpectedly, trying to restart");
+        METLIBS_LOG_INFO("CoClient: connection to coserver closed unexpectedly, trying to restart");
         tryToStartCoServer();
     } else {
-        LOG4CXX_INFO(logger, "CoClient: error when contacting coserver: " << e);
+        METLIBS_LOG_INFO("CoClient: error when contacting coserver: " << e);
     }
 }
 
@@ -459,18 +449,18 @@ void CoClient::tryToStartCoServer()
 
     mNextAttemptToStartServer = now.addSecs(SERVER_START_RETRY_DELAY);
 
-    LOG4CXX_INFO(logger, "CoClient: starting coserver...");
+    METLIBS_LOG_INFO("CoClient: starting coserver...");
     QStringList args = QStringList("-d"); ///< -d for dynamicMode
     if (port > 0)
         args << "-p" << QString::number(port);
     
     if (not QProcess::startDetached(serverCommand, args)) {
-        LOG4CXX_ERROR(logger, "CoClient: could not start server. Make sure the path of coserver4"
+        METLIBS_LOG_ERROR("CoClient: could not start server. Make sure the path of coserver4"
                       " is correctly set in the setup of your client, and try again.");
         /*emit*/ unableToConnect();
         return;
     }
     
-    LOG4CXX_INFO(logger, "CoClient: coserver probably started, will try to connect soon...");
+    METLIBS_LOG_INFO("CoClient: coserver probably started, will try to connect soon...");
     QTimer::singleShot(500, this, SLOT(connectToServer()));
 }
