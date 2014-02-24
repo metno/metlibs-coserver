@@ -1,4 +1,4 @@
-Source: metlibs-common-coserver
+Source: metlibs-qt-coserver
 Priority: optional
 Maintainer: Alexander Bürger <alexander.buerger@met.no>
 Build-Depends:  debhelper (>= 7), autotools-dev, g++,
