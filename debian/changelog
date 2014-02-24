@@ -1,16 +1,16 @@
-metlibs-common-coserver (1.0.1-1) unstable; urgency=low
+metlibs-qt-coserver (1.0.1-1) unstable; urgency=low
 
   * fixed pkg-config file
 
  -- Alexander Carl Friedrich Bürger <alexander.buerger@met.no>  Thu, 06 Feb 2014 11:15:32 +0100
 
-metlibs-common-coserver (1.0.0-2) unstable; urgency=low
+metlibs-qt-coserver (1.0.0-2) unstable; urgency=low
 
   * fixed dependencies
 
  -- Lisbeth Bergholt <lisbeth.bergholt@met.no>  Tue, 04 Feb 2014 20:47:22 +0100
 
-metlibs-common-coserver (1.0.0-1) unstable; urgency=low
+metlibs-qt-coserver (1.0.0-1) unstable; urgency=low
 
   * Split from all-in-one metlibs
 
