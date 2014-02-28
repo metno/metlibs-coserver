@@ -1,3 +1,10 @@
+metlibs-qt-coserver (1.1.0-2) unstable; urgency=low
+
+  * ClientButton can re-use existing CoClient object
+  * use METLIBS_LOG_* macros for logging
+
+ -- Alexander Carl Friedrich Bürger <alexander.buerger@met.no>  Mon, 17 Feb 2014 13:17:43 +0100
+
 metlibs-qt-coserver (1.0.1-1) unstable; urgency=low
 
   * fixed pkg-config file
