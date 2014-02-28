@@ -43,109 +43,138 @@
 #include "disconn.xpm"
 #include "unconn.xpm"
 
-#include <iostream>
+#ifdef __WIN32__
+#define METLIBS_LOG_SCOPE(x) /* emtpy */
+#define METLIBS_LOG_ERROR(x) /* emtpy */
+#define METLIBS_LOG_INFO(x)  /* emtpy */
+#define METLIBS_LOG_DEBUG(x) /* emtpy */
+#else
+#define MILOGGER_CATEGORY "coserver.ClientButton"
+#include <miLogger/miLogging.h>
+#endif /* __WIN32__ */
 
 using namespace std;
 
 ClientButton::ClientButton(const QString & name, const QString & server, QWidget * parent)
-    : QPushButton(name, parent)
-    , coclient(new CoClient(name.toAscii(), "localhost", server.toAscii()))
-    , uselabel(false)
+  : QPushButton(name, parent)
+  , coclient(new CoClient(name.toAscii(), "localhost", server.toAscii()))
+  , isMyClient(true)
+  , uselabel(false)
 {
-    setIcon(QPixmap(disconn_xpm));
-    setToolTip("Disconnected");
-    setText("");
+  initialize();
+}
 
-    connect(this, SIGNAL(clicked()), SLOT(connectToServer()));
+ClientButton::ClientButton(CoClient* client, QWidget * parent)
+  : QPushButton(QString::fromStdString(client->getClientType()), parent)
+  , coclient(client)
+  , isMyClient(false)
+  , uselabel(false)
+{
+  initialize();
+}
 
-    connect(coclient.get(), SIGNAL(newClient(const std::string&)), SLOT(setLabel(const std::string&)));
-    connect(coclient.get(), SIGNAL(connected()), SLOT(connected()));
-    connect(coclient.get(), SIGNAL(unableToConnect()), SLOT(unableToConnect()));
-    connect(coclient.get(), SIGNAL(disconnected()), SLOT(disconnected()));
-    connect(coclient.get(), SIGNAL(receivedMessage(const miMessage&)), SIGNAL(receivedMessage(const miMessage&)));
-    connect(coclient.get(), SIGNAL(addressListChanged()), SIGNAL(addressListChanged()));
+void ClientButton::initialize()
+{
+  connect(this, SIGNAL(clicked()), SLOT(connectToServer()));
+  
+  connect(coclient, SIGNAL(newClient(const std::string&)), SLOT(setLabel(const std::string&)));
+  connect(coclient, SIGNAL(connected()), SLOT(connected()));
+  connect(coclient, SIGNAL(unableToConnect()), SLOT(unableToConnect()));
+  connect(coclient, SIGNAL(disconnected()), SLOT(disconnected()));
+  connect(coclient, SIGNAL(receivedMessage(const miMessage&)), SIGNAL(receivedMessage(const miMessage&)));
+  connect(coclient, SIGNAL(addressListChanged()), SIGNAL(addressListChanged()));
+
+  setText("");
+  if (coclient->notConnected())
+    disconnected();
+  else
+    connected();
 }
 
 ClientButton::~ClientButton()
 {
-    cerr << "ClientButton::~ClientButton()" << endl;
+  METLIBS_LOG_SCOPE();
+  if (isMyClient)
+    delete coclient;
 }
 
 void ClientButton::connectToServer()
 {
-    cerr << "ClientButton::connectToServer()" << endl;
-    
-    if (coclient->notConnected()) {
-        cerr << "ClientButton::connectToServer(): not connected -> connecting" << endl;
-        setIcon(QPixmap(disconn_xpm));
-        setToolTip("Connecting...");
-        coclient->connectToServer();
-    } else {
-        cerr << "ClientButton::connectToServer(): connected -> disconnecting" << endl;
-        coclient->disconnectFromServer();
-        setToolTip("Disconnected");
-        setLabel("noClient");
-        /*emit*/ connectionClosed();
-    }
+  METLIBS_LOG_SCOPE();
+  
+  if (coclient->notConnected()) {
+    METLIBS_LOG_DEBUG("not connected -> connecting");
+    setIcon(QPixmap(disconn_xpm));
+    setToolTip("Connecting...");
+    coclient->connectToServer();
+  } else {
+    METLIBS_LOG_DEBUG("connected -> disconnecting");
+    coclient->disconnectFromServer();
+    setToolTip("Disconnected");
+    setLabel("noClient");
+    /*emit*/ connectionClosed();
+  }
 }
 
 void ClientButton::connected()
 {
-    cerr << "ClientButton::connected()" << endl;
-    setIcon(QPixmap(conn_xpm));
-    setToolTip("Connected");
-    /*emit*/ connectedToServer();
+  METLIBS_LOG_SCOPE();
+  setIcon(QPixmap(conn_xpm));
+  setToolTip("Connected");
+  /*emit*/ connectedToServer();
 }
 
-void ClientButton::disconnected() {
-    cerr << "ClientButton::disconnected()" << endl;
-    setIcon(QPixmap(unconn_xpm));
-    setToolTip("Disconnected from CoServer");
-    /*emit*/ connectionClosed();
+void ClientButton::disconnected()
+{
+  METLIBS_LOG_SCOPE();
+  setIcon(QPixmap(unconn_xpm));
+  setToolTip("Disconnected from CoServer");
+  /*emit*/ connectionClosed();
 }
 
 void ClientButton::unableToConnect()
 {
-    cerr << "ClientButton::disconnected()" << endl;
-    setLabel("portBusy");
-    setToolTip("Unable to connect");
+  METLIBS_LOG_SCOPE();
+  setLabel("portBusy");
+  setToolTip("Unable to connect");
 }
 
-void ClientButton::setLabel(const std::string& name) {
-    if (name == "noClient") {
-        setIcon(QPixmap(disconn_xpm));
-        setText("");
-    } else if (name == "myself") {
-        setIcon(QPixmap(conn_xpm));
-        setText("");
-    } else if (name == "portBusy") {
-        setIcon(QPixmap(unconn_xpm));
-        setText("");
-    } else if (uselabel ) {
-        setIcon(QPixmap(conn_xpm));
-
-        /// not useful anymore.. needs refactoring
-        setText("");
-        //setText(name.c_str());
-    }
+void ClientButton::setLabel(const std::string& name)
+{
+  if (name == "noClient") {
+    setIcon(QPixmap(disconn_xpm));
+    setText("");
+  } else if (name == "myself") {
+    setIcon(QPixmap(conn_xpm));
+    setText("");
+  } else if (name == "portBusy") {
+    setIcon(QPixmap(unconn_xpm));
+    setText("");
+  } else if (uselabel ) {
+    setIcon(QPixmap(conn_xpm));
+    
+    /// not useful anymore.. needs refactoring
+    setText("");
+    //setText(name.c_str());
+  }
 }
 
 void ClientButton::sendMessage(miMessage& msg)
 {
-    coclient->sendMessage(msg);
+  coclient->sendMessage(msg);
 }
 
 const std::string& ClientButton::getClientName(int id)
 {
-    return coclient->getClientName(id);
+  return coclient->getClientName(id);
 }
 
 bool ClientButton::clientTypeExist(const std::string& type)
 {
-    return coclient->clientTypeExist(type);
+  return coclient->clientTypeExist(type);
 }
 
 void ClientButton::useLabel(bool label)
 {
-    uselabel = label;
+  uselabel = label;
 }

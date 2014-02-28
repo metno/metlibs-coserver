@@ -52,6 +52,10 @@ public:
      * @param parent Parent widget
      */
     ClientButton(const QString & text, const QString & server, QWidget * parent);
+
+    /* This button re-uses an existing CoClient object. */
+    ClientButton(CoClient* client, QWidget * parent);
+
     ~ClientButton();
 
     /**
@@ -106,8 +110,15 @@ Q_SIGNALS:
     void connectedToServer();
 
 private:
-    std::auto_ptr<CoClient> coclient;
-    bool uselabel;
+    void initialize();
+
+private:
+  CoClient* coclient;
+  
+  //! true iff the coclient object is owned by this ClientButton
+  bool isMyClient;
+
+  bool uselabel;
 };
 
 #endif

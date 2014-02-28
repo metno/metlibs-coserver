@@ -54,6 +54,7 @@
 #define METLIBS_LOG_INFO(x)  /* emtpy */
 #define METLIBS_LOG_DEBUG(x) /* emtpy */
 #else
+#define MILOGGER_CATEGORY "coserver.CoClient"
 #include <miLogger/miLogging.h>
 #endif /* __WIN32__ */
 

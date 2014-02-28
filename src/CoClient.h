@@ -46,6 +46,9 @@ public:
     CoClient(const char* clientType, const char* host, const char* serverCommand, quint16 port = 0);
     ~CoClient();
 
+    const std::string& getClientType() const
+      { return clientType; }
+
     /**
      * Send message to all CoServer client
      */
