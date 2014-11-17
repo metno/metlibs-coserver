@@ -57,7 +57,7 @@ using namespace std;
 
 ClientButton::ClientButton(const QString & name, const QString & server, QWidget * parent)
   : QPushButton(name, parent)
-  , coclient(new CoClient(name.toAscii(), "localhost", server.toAscii()))
+  , coclient(new CoClient(name.toLatin1(), "localhost", server.toLatin1()))
   , isMyClient(true)
   , uselabel(false)
 {
