@@ -1,8 +1,8 @@
 /**
  * coclient - coserver client file
- * @author Martin Lilleeng S�tra <martinls@met.no>
+ * @author Martin Lilleeng Saetra <martinls@met.no>
  *
- * Copyright (C) 2013 met.no
+ * Copyright (C) 2013-2015 met.no
  *
  * Contact information:
  * Norwegian Meteorological Institute
@@ -26,11 +26,18 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-// TODO: Add support for multiple servers active on different ports (on the same node)
-// TODO: Add support for multiple clients per server
-
 #include "CoClient.h"
+
+#include "miMessage.h"
+#include "miMessageIO.h"
 #include "QLetterCommands.h"
+
+#include <QtCore/QProcess>
+#include <QtCore/QStringList>
+#include <QtCore/QTimer>
+
+#define MILOGGER_CATEGORY "coserver.CoClient"
+#include <qUtilities/miLoggingQt.h>
 
 #ifdef __WIN32__
 // GetUserName()
@@ -42,22 +49,6 @@
 #include <pwd.h>
 #endif
 
-// Qt-includes
-#include <QtCore/QProcess>
-#include <QtCore/QStringList>
-#include <QtCore/QTimer>
-#include <QtNetwork/QTcpSocket>
-
-#ifdef __WIN32__
-#define METLIBS_LOG_SCOPE(x) /* emtpy */
-#define METLIBS_LOG_ERROR(x) /* emtpy */
-#define METLIBS_LOG_INFO(x)  /* emtpy */
-#define METLIBS_LOG_DEBUG(x) /* emtpy */
-#else
-#define MILOGGER_CATEGORY "coserver.CoClient"
-#include <miLogger/miLogging.h>
-#endif /* __WIN32__ */
-
 #include <boost/algorithm/string.hpp>
 
 #include <fstream>
@@ -65,87 +56,61 @@
 #include <unistd.h>
 
 namespace /* anonymous */ {
-std::string safe_getenv(const char* var)
+
+QString safe_getenv(const char* var)
 {
     const char* v = getenv(var);
     if (not v)
-        return std::string();
+        return QString();
     return v;
 }
 
-const int SERVER_START_RETRY_DELAY = 2;
+const int SERVER_START_RETRY_DELAY = 15;
+
+QString getUserId()
+{
+#ifdef __WIN32__
+    DWORD size = UNLEN + 1;
+    CHAR name[size];
+    if (!GetUserNameA(name, &size)) {
+        std::cerr << "GetUserNameA() failed" << std::endl;
+        return "UnknownWin32User";
+    } else {
+        return name;
+    }
+#else
+    uid_t uid = getuid();
+    struct passwd *pw = getpwuid(uid);
+    if (pw) {
+        return pw->pw_name;
+    } else {
+        return QString("UnknownUser") + QString::number(uid);
+    }
+#endif
+}
+
 } // namespace anonymous
 
-CoClient::CoClient(const char *name, const char *h, const char *sc, quint16 p)
-    : tcpSocket(new QTcpSocket(this))
-    , clientType(name)
-    , serverCommand(QString::fromStdString(sc))
-    , host(h)
-    , blockSize(0)
-    , port(p)
-    , mNextAttemptToStartServer(QDateTime::currentDateTime().addSecs(-30))
+CoClient::CoClient(const QString& ct, const QString& h, quint16 port)
 {
-#if 0
-    if (port == 0)
-        port = readPortFromFile_Services();
-#else
-    if (port == 0)
-        port = readPortFromFile();
-#endif
+    initialize(ct);
+
     if (port == 0)
         port = qmstrings::port;
-
+    serverUrl.setScheme("co4");
     if (getenv("COSERVER_HOST") != NULL) {
-        host = getenv("COSERVER_HOST");
+        serverUrl.setHost(getenv("COSERVER_HOST"));
+    } else {
+        serverUrl.setHost(h);
     }
+    serverUrl.setPort(port);
 
-    if (getenv("USER") != NULL) {
-        userid = getenv("USER");
-    } else {
-        userid = safe_getenv("USERNAME");
-    }
-    if (getenv("HOSTNAME") != NULL) {
-        userid += "@" + safe_getenv("HOSTNAME");
-    } else {
-        userid += "@" + safe_getenv("COMPUTERNAME");
-    }
-#ifdef __WIN32__
-    {
-        DWORD size = UNLEN + 1;
-        CHAR name[size];
-        if (!GetUserNameA(name, &size)) {
-            std::cerr << "GetUserNameA() failed" << std::endl;
-            userid = "UnknownWin32User";
-        } else {
-            userid = name;
-        }
-    }
-#else
-    {
-        uid_t uid = getuid();
-        struct passwd *pw = getpwuid(uid);
-        if (pw) {
-            userid = pw->pw_name;
-        } else {
-            std::stringstream ss;
-            ss << "UnknownUser" << uid;
-            userid = ss.str();
-        }
-    }
-#endif
-    
-    // connected to coserver
-    connect(tcpSocket, SIGNAL(connected()), this, SLOT(connectionEstablished()));
-    // anything new to read?
-    connect(tcpSocket, SIGNAL(readyRead()), this, SLOT(readNew()));
-    // connection to server closed
-    connect(tcpSocket, SIGNAL(disconnected()), this, SLOT(connectionClosed()));
-    // socket error
-    connect(tcpSocket, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(socketError(QAbstractSocket::SocketError)));
-    
-#ifdef _DEBUG
-    connect(tcpSocket, SIGNAL(bytesWritten(qint64)), this, SLOT(printBytesWritten(qint64)));
-#endif
+}
+
+CoClient::CoClient(const QString& ct, const QUrl& url)
+    : serverUrl(url)
+{
+    initialize(ct);
 }
 
 CoClient::~CoClient()
@@ -153,102 +118,66 @@ CoClient::~CoClient()
     METLIBS_LOG_SCOPE();
 }
 
-void CoClient::setBroadcastClient()
+void CoClient::initialize(const QString& ct)
 {
-    userid = "";
+    tcpSocket = 0;
+    localSocket = 0;
+    mId = -1;
+    name = clientType = ct;
+    serverCommand = "coserver4";
+    mNextAttemptToStartServer = QDateTime::currentDateTime().addSecs(-30);
+
+    userid = safe_getenv("COSERVER_USER");
+    if (userid.isEmpty())
+        userid = getUserId();
 }
 
-int CoClient::readPortFromFile()
+void CoClient::setUserId(const QString& user)
 {
-    METLIBS_LOG_SCOPE();
-    
-    const std::string homePath = safe_getenv("HOME");
-    METLIBS_LOG_DEBUG("homePath: " << homePath);
-    
-    std::ifstream pfile((homePath + "/.coserver.port").c_str());
-    if (not pfile.is_open()) {
-        METLIBS_LOG_DEBUG("Could not read coserver.port from file");
-        return 0;
-    }
-
-    int filePort = 0;
-    pfile >> filePort;
-    if (not pfile) {
-        METLIBS_LOG_DEBUG("Could not read port number from file");
-        return 0;
-    }
-    
-    METLIBS_LOG_DEBUG("Port: " << filePort << " read from file.");
-    return filePort;
+    userid = user;
 }
 
-// etc/services: diana-<username>		<port>/tcp		# comment
-int CoClient::readPortFromFile_Services()
+void CoClient::createSocket()
 {
-    METLIBS_LOG_SCOPE();
-    
-    const char filename[] = "/etc/services";
-    std::ifstream file(filename);
-    if (not file.is_open()) {
-        METLIBS_LOG_DEBUG("Could not open file '" << filename << "'");
-        return 0;
+    QObject* device;
+    if (serverUrl.scheme() == "co4") {
+        tcpSocket = new QTcpSocket(this);
+        io.reset(new miMessageIO(tcpSocket, false));
+        device = tcpSocket;
+
+        connect(tcpSocket, SIGNAL(error(QAbstractSocket::SocketError)),
+                SLOT(tcpError(QAbstractSocket::SocketError)));
+    } else if (serverUrl.scheme() == "local") {
+        localSocket = new QLocalSocket(this);
+        io.reset(new miMessageIO(localSocket, false));
+        device = localSocket;
+
+        connect(localSocket, SIGNAL(error(QLocalSocket::LocalSocketError)),
+                SLOT(localError(QLocalSocket::LocalSocketError)));
+    } else {
+        METLIBS_LOG_ERROR("bad server url '" << serverUrl.toString(QUrl::RemovePassword) << "'");
+        return;
     }
-    
-    const char* user = getenv("USER");
-    if (not user) {
-        METLIBS_LOG_DEBUG("Environment variable 'USER' not set.");
-        return 0;
-    }
-
-    int filePort = 0;
-    std::string line;
-    while(std::getline(file, line)) {
-        if (line.empty() or line.at(0) == '#' or line.at(0) == '\n' or line.at(0) == ' ')
-            continue;
-        
-        boost::replace_all(line, "\t", " ");
-        boost::replace_all(line, "/", " ");
-        std::vector<std::string> tokens;
-        boost::split(tokens, line, boost::is_any_of(" "));
-        if (tokens.size() < 2 or tokens[1].empty())
-            continue;
-        std::vector<std::string> tokens2;
-        boost::split(tokens2, tokens[1], boost::is_any_of("-"));
-        if (tokens2.size() != 2 or tokens2[1].empty())
-            continue;
-        if (tokens2[1] != user)
-            continue;
-        filePort = std::atoi(tokens2[1].c_str());
-    }
-    METLIBS_LOG_DEBUG("Port: " << filePort << " read from '" << filename << "'");
-    return filePort;
-}
-
-void CoClient::printBytesWritten(qint64 written)
-{
-    (void)written;
-    METLIBS_LOG_DEBUG("Written " << written << " bytes to socket");
-}
-
-bool CoClient::notConnected()
-{
-    return (QAbstractSocket::UnconnectedState == tcpSocket->state());
-}
-
-void CoClient::connectionClosed()
-{
-    METLIBS_LOG_DEBUG("CoClient disconnected from server");
-    /*emit*/ disconnected();
+    // signals are name based, so it is not a problem to mix classes
+    connect(device, SIGNAL(connected()),
+            SLOT(connectionEstablished()));
+    connect(device, SIGNAL(disconnected()),
+            SLOT(connectionClosed()));
+    connect(device, SIGNAL(readyRead()),
+            SLOT(readNew()));
 }
 
 void CoClient::connectToServer()
 {
     METLIBS_LOG_SCOPE();
-    if (port > 0) {
-        METLIBS_LOG_INFO("connecting to port " << port);
-        tcpSocket->connectToHost(host, port);
-    } else {
-        METLIBS_LOG_ERROR("bad port " << port);
+    if (!io.get())
+        createSocket();
+    if (tcpSocket) {
+        METLIBS_LOG_INFO("connecting to host '" << serverUrl.host() << "' port " << serverUrl.port());
+        tcpSocket->connectToHost(serverUrl.host(), serverUrl.port());
+    } else if (localSocket) {
+        METLIBS_LOG_INFO("connecting to server '" << serverUrl.path() << "'");
+        localSocket->connectToServer(serverUrl.path());
     }
 }
 
@@ -257,188 +186,345 @@ void CoClient::disconnectFromServer()
     tcpSocket->disconnectFromHost();
 }
 
-void CoClient::readNew()
+bool CoClient::notConnected()
 {
-    QDataStream in(tcpSocket);
-    in.setVersion(QDataStream::Qt_4_0);
-    
-    // make sure that the whole message has been written
-    if (blockSize == 0) {
-        if (tcpSocket->bytesAvailable() < (int)sizeof(quint16))
-            return;
-        
-        in >> blockSize;
-    }
-
-    if (tcpSocket->bytesAvailable() < blockSize)
-        return;
-    
-    // read incoming message
-    miMessage msg;
-    QString tmpcommand, tmpdescription, tmpcommondesc, tmpcommon,
-        tmpclientType, tmpco, tmpdata;
-    int size = 0;
-    
-    in >> msg.to;
-    in >> msg.from;
-    in >> tmpcommand;
-    msg.command = tmpcommand.toStdString();
-    in >> tmpdescription;
-    msg.description = tmpdescription.toStdString();
-    in >> tmpcommondesc;
-    msg.commondesc = tmpcommondesc.toStdString();
-    in >> tmpcommon;
-    msg.common = tmpcommon.toStdString();
-    in >> tmpclientType;
-    msg.clientType = tmpclientType.toStdString();
-    in >> tmpco;
-    msg.co = tmpco.toStdString();
-    in >> size; // NOT A FIELD IN MIMESSAGE (METADATA ONLY)
-    for (int i = 0; i < size; i++) {
-        in >> tmpdata;
-        msg.data.push_back(tmpdata.toStdString());
-    }
-    
-    METLIBS_LOG_DEBUG("miMessage in CoClient::readNew() (RECV)" << std::endl << msg.content());
-   
-    // if origin is the server itself, then it will always be a request to
-    // change (add/delete) entries in the list of clients
-    if (msg.from == 0)
-        editClients(msg);
-    
-    /*emit*/ receivedMessage(msg);
-
-    blockSize = 0;
-    
-    // more unread messages on socket?
-    if (tcpSocket->bytesAvailable() > 0)
-        readNew();
+    if (tcpSocket)
+        return (QAbstractSocket::UnconnectedState == tcpSocket->state());
+    else if (localSocket)
+        return (QLocalSocket::UnconnectedState == localSocket->state());
+    else
+        return true;
 }
 
-void CoClient::editClients(const miMessage& msg)
+bool CoClient::isConnected()
 {
-    std::vector<std::string> common;
-    boost::split(common, msg.common, boost::is_any_of(":"));
-    if (common.size() < 2)
-        return;
-    
-    const int id = atoi(common[0].c_str());
-    const std::string& type = common[1];
+    if (tcpSocket)
+        return (QAbstractSocket::ConnectedState == tcpSocket->state());
+    else if (localSocket)
+        return (QLocalSocket::ConnectedState == localSocket->state());
+    else
+        return false;
+}
 
-    if (msg.command == qmstrings::newclient) {
-        clients.erase(id);
-        clients[id] = type;
-        METLIBS_LOG_INFO("Added new client of type " << type << " and id " << id << " to the list of clients");
-        
-        /*emit*/ newClient(type);
-        /*emit*/ addressListChanged();
-    } else if (msg.command == qmstrings::removeclient) {
-        clients.erase(id);
-        METLIBS_LOG_INFO("Removed client of type " << type << " and id " << id << " from the list of clients");
-        
-        /*emit*/ newClient("myself");
-        /*emit*/ addressListChanged();
+void CoClient::connectionClosed()
+{
+    METLIBS_LOG_SCOPE();
+
+    for (clients_t::const_iterator it = clients.begin(); it != clients.end(); ++it) {
+        METLIBS_LOG_DEBUG(LOGVAL(it->first));
+        Q_EMIT clientChange(it->first, CLIENT_GONE);
+        Q_EMIT clientChange(it->first, CLIENT_UNREGISTERED);
+    }
+    clients.clear();
+    mId = -1;
+
+    Q_EMIT disconnected();
+}
+
+void CoClient::readNew()
+{
+    METLIBS_LOG_SCOPE();
+    int from;
+    ClientIds to;
+    miQMessage qmsg;
+    while (io->read(from, to, qmsg)) {
+        bool send = true;
+        if (from == 0)
+            send = messageFromServer(qmsg);
+        if (send)
+            emitMessage(from, qmsg);
+    }
+}
+
+void CoClient::emitMessage(int fromId, const miQMessage& qmsg)
+{
+    METLIBS_LOG_SCOPE(qmsg);
+    Q_EMIT receivedMessage(fromId, qmsg);
+
+    miMessage msg;
+    convert(fromId, mId, qmsg, msg);
+    Q_EMIT receivedMessage(msg);
+}
+
+void CoClient::setName(const QString& n)
+{
+    METLIBS_LOG_SCOPE();
+    if (n == name)
+        return;
+
+    name = n;
+
+    miQMessage qmsg("SETNAME");
+    qmsg.addCommon("name", name);
+    sendMessageToServer(qmsg);
+}
+
+ClientIds CoClient::getClientIds() const
+{
+    ClientIds ids;
+    for (clients_t::const_iterator it = clients.begin(); it != clients.end(); ++it)
+        ids.insert(it->first);
+    return ids;
+}
+
+QString CoClient::getClientType(int id) const
+{
+    clients_t::const_iterator it = clients.find(id);
+    if (it != clients.end())
+        return it->second.type;
+    else
+        return QString();
+}
+
+QString CoClient::getClientName(int id) const
+{
+    clients_t::const_iterator it = clients.find(id);
+    if (it != clients.end())
+        return it->second.name;
+    else
+        return QString();
+}
+
+void CoClient::setSelectedPeerNames(const QStringList& names)
+{
+    METLIBS_LOG_SCOPE();
+    mSelectedPeerNames = names;
+    sendSetPeers();
+}
+
+void CoClient::sendSetPeers()
+{
+    METLIBS_LOG_SCOPE();
+    miQMessage setpeers("SETPEERS");
+    setpeers.addDataDesc("peer_ids");
+    for (clients_t::const_iterator it = clients.begin(); it != clients.end(); ++it) {
+        if (mSelectedPeerNames.isEmpty() || mSelectedPeerNames.contains(it->second.name))
+            setpeers.addDataValues(QStringList(QString::number(it->first)));
+    }
+    sendMessageToServer(setpeers);
+}
+
+bool CoClient::messageFromServer(const miQMessage& qmsg)
+{
+    METLIBS_LOG_SCOPE(LOGVAL(qmsg.command()));
+
+    if (qmsg.command() == qmstrings::registeredclient) {
+        handleRegisteredClient(qmsg);
+    } else if (qmsg.command() == qmstrings::newclient) {
+        handleNewClient(qmsg);
+    } else if (qmsg.command() == qmstrings::renameclient) {
+        handleRenameClient(qmsg);
+    } else if (qmsg.command() == qmstrings::removeclient) {
+        handleRemoveClient(qmsg);
+    } else if (qmsg.command() == qmstrings::unregisteredclient) {
+        handleUnregisteredClient(qmsg);
     } else {
-        METLIBS_LOG_ERROR("Error editing client list");
+        METLIBS_LOG_ERROR("Error editing client list, unknown command '" << qmsg.command() << "'");
+    }
+    return true;
+}
+
+void CoClient::handleRegisteredClient(const miQMessage& qmsg)
+{
+    METLIBS_LOG_SCOPE();
+
+    // this client's id is sent in the first message from the server
+    const int idxMyId = qmsg.findCommonDesc("id");
+    if (idxMyId >= 0) {
+        bool idOk = false;
+        const int myId = qmsg.getCommonValue(idxMyId).toInt(&idOk);
+        if (idOk) {
+            mId = myId;
+            METLIBS_LOG_INFO("received my id " << mId);
+        } else {
+            METLIBS_LOG_WARN("could not parse id from '" << qmsg.getCommonValue(idxMyId) << "'");
+        }
+    }
+
+    // other clients' ids are sent in the first message or later
+    const int idxId = qmsg.findDataDesc("id"),
+            idxType = qmsg.findDataDesc("type"),
+            idxName = qmsg.findDataDesc("name");
+    if (idxId >= 0 && idxName >= 0 && idxType >= 0) {
+        for (int i=0; i<qmsg.countDataRows(); ++i) {
+            const QString& pIdText = qmsg.getDataValue(i, idxId);
+            const int pId = pIdText.toInt();
+            const QString& pName = qmsg.getDataValue(i, idxName);
+            const QString& pType = qmsg.getDataValue(i, idxType);
+
+            clients_t::iterator it = clients.find(pId);
+            if (it == clients.end()) {
+                clients.insert(std::make_pair(pId, Client(pType, pName)));
+                METLIBS_LOG_INFO("registered client " << pId << " of type " << pType);
+                Q_EMIT clientChange(pId, CLIENT_REGISTERED);
+            } else {
+                METLIBS_LOG_WARN("bad registered message for known client " << pId);
+            }
+        }
+        sendSetPeers();
+    }
+}
+
+void CoClient::handleUnregisteredClient(const miQMessage& qmsg)
+{
+    METLIBS_LOG_SCOPE();
+    const int idxId = qmsg.findDataDesc("id");
+    if (idxId >= 0 && qmsg.countDataRows() > 0) {
+        for (int i=0; i<qmsg.countDataRows(); ++i) {
+            const QString& pIdText = qmsg.getDataValue(i, idxId);
+            const int pId = pIdText.toInt();
+
+            clients_t::iterator it = clients.find(pId);
+            if (it != clients.end()) {
+                Q_EMIT clientChange(pId, CLIENT_UNREGISTERED);
+                clients.erase(pId);
+                METLIBS_LOG_INFO("unregistered client " << pId);
+            } else {
+                METLIBS_LOG_WARN("bad unregistered message for client " << pId);
+            }
+        }
+        sendSetPeers();
+    }
+}
+
+void CoClient::handleNewClient(const miQMessage& qmsg)
+{
+    METLIBS_LOG_SCOPE();
+
+    const int id = qmsg.getCommonValue("id").toInt();
+    clients_t::iterator it = clients.find(id);
+    if (it != clients.end() && !it->second.connected) {
+        METLIBS_LOG_INFO("connected with client " << id);
+        it->second.connected = true;
+        Q_EMIT clientChange(id, CLIENT_NEW);
+        Q_EMIT newClient(it->second.type);
+        Q_EMIT newClient(it->second.type.toStdString());
+        Q_EMIT addressListChanged();
+    } else {
+        METLIBS_LOG_WARN("bad connect message for client " << id);
+    }
+}
+
+void CoClient::handleRemoveClient(const miQMessage& qmsg)
+{
+    METLIBS_LOG_SCOPE();
+
+    const int id = qmsg.getCommonValue("id").toInt();
+    clients_t::iterator it = clients.find(id);
+    if (it != clients.end() && it->second.connected) {
+        it->second.connected = false;
+        METLIBS_LOG_INFO("diconnected from client " << id);
+
+        Q_EMIT clientChange(id, CLIENT_GONE);
+        Q_EMIT newClient(std::string("myself"));
+        Q_EMIT addressListChanged();
+    } else {
+        METLIBS_LOG_WARN("bad disconnect message for client " << id);
+    }
+}
+
+void CoClient::handleRenameClient(const miQMessage& qmsg)
+{
+    METLIBS_LOG_SCOPE();
+
+    const int id = qmsg.getCommonValue("id").toInt();
+    const QString name = qmsg.getCommonValue("name");
+
+    clients_t::iterator it = clients.find(id);
+    if (it != clients.end()) {
+        bool renamedPeer = false;
+        for (int i=0; i<mSelectedPeerNames.count(); ++i) {
+            if (mSelectedPeerNames[i] == it->second.name) {
+                mSelectedPeerNames[i] = name;
+                renamedPeer = true;
+                break;
+            }
+        }
+        it->second.name = name;
+        if (renamedPeer)
+            sendSetPeers();
+        Q_EMIT clientChange(it->first, CLIENT_RENAME);
+    } else {
+        METLIBS_LOG_WARN("bad rename message for unknown client " << id);
     }
 }
 
 void CoClient::connectionEstablished()
 {
-    METLIBS_LOG_INFO("CoClient connected to server");
-    
-    miMessage msg(0, 0, "SETTYPE", "INTERNAL");
-    msg.data.push_back(clientType);
-    msg.commondesc = "userId";
-    msg.common = userid;
-    sendMessage(msg);
-    /*emit*/ connected();
+    METLIBS_LOG_SCOPE();
+    sendClientType();
+    Q_EMIT connected();
 }
 
-bool CoClient::sendMessage(miMessage &msg)
+void CoClient::sendClientType()
 {
-    bool hasReceiver = false;
-    
-    if (tcpSocket->state() == QTcpSocket::ConnectedState) {
-        std::map<int, std::string>::iterator it;
-        if(msg.to != 0 && msg.to != -1) { ///< if the message is for the server or is a broadcast, do not do anything
-            
-            for(it = clients.begin(); it != clients.end(); ++it) {
-                if((int)it->first == msg.to) {
-                    hasReceiver = true;
-                    break;
-                }
-            }
-        }
-        
-        /// if msg does not contain a valid receiver address, broadcast it to all clients
-        if(not hasReceiver)
-            msg.to = -1;
-        
-        METLIBS_LOG_DEBUG("miMessage in CoClient::sendMessage() (SEND)" << std::endl << msg.content());
+    METLIBS_LOG_SCOPE();
+    miQMessage qmsg("SETTYPE");
+    qmsg.addCommon("type", clientType);
+    qmsg.addCommon("userId", userid);
+    qmsg.addCommon("name", name);
+    qmsg.addCommon("protocolVersion", 1);
 
-        QByteArray block;
-        QDataStream out(&block, QIODevice::WriteOnly);
-        out.setVersion(QDataStream::Qt_4_0);
+    sendMessageToServer(qmsg);
+}
 
-        // send message to server
-        out << (quint32)0;
-        
-        out << msg.to;
-        // msg.from is set by server-side socket
-        out << QString::fromStdString(msg.command);
-        out << QString::fromStdString(msg.description);
-        out << QString::fromStdString(msg.commondesc);
-        out << QString::fromStdString(msg.common);
-        out << QString::fromStdString(msg.clientType);
-        out << QString::fromStdString(msg.co);
-        out << quint32(msg.data.size()); // NOT A FIELD IN MIMESSAGE (TEMP ONLY)
-        METLIBS_LOG_DEBUG("Size of data in last sent msg: " << msg.data.size());
-        for (unsigned int i = 0; i < msg.data.size(); i++) {
-            out << QString::fromStdString(msg.data[i]);
-        }
+void CoClient::sendMessageToServer(const miQMessage& qmsg)
+{
+    sendMessage(qmsg, clientId(0));
+}
 
-        out.device()->seek(0);
-        out << (quint32)(block.size() - sizeof(quint32));
-        
-        tcpSocket->write(block);
-        tcpSocket->waitForBytesWritten(250);
-        return true;
-    } else {
-        METLIBS_LOG_ERROR("Error sending message");
+bool CoClient::sendMessage(const miMessage &msg)
+{
+    if (!isConnected())
         return false;
-    }
+
+    int from, to;
+    miQMessage qmsg;
+    convert(msg, from, to, qmsg);
+    ClientIds receivers;
+    if (to != -1)
+        receivers.insert(to);
+    return sendMessage(qmsg, receivers);
 }
 
-const std::string& CoClient::getClientName(int id)
+bool CoClient::sendMessage(const miQMessage& qmsg, const ClientIds& to)
 {
-    std::map<int,std::string>::const_iterator it = clients.find(id);
-    if (it == clients.end()) {
-        static const std::string empty;
-        return empty;
-    }
-    return it->second;
+    METLIBS_LOG_SCOPE(qmsg);
+    if (!isConnected())
+        return false;
+
+    METLIBS_LOG_INFO(LOGVAL(mId) << " protocolVersion=" << io->protocolVersion());
+
+    io->write(-1 /*ignored*/, to, qmsg);
+    if (tcpSocket)
+        tcpSocket->waitForBytesWritten(250);
+    else if (localSocket)
+        localSocket->waitForBytesWritten(250);
+    return true;
 }
 
-bool CoClient::clientTypeExist(const std::string& type)
+void CoClient::tcpError(QAbstractSocket::SocketError e)
 {
-    std::map<int, std::string>::iterator it;
-    for (it = clients.begin(); it != clients.end(); it++)
-        if ((*it).second == type)
-            return true;
-    return false;
-}
-
-void CoClient::socketError(QAbstractSocket::SocketError e)
-{
+    METLIBS_LOG_SCOPE();
     if (QAbstractSocket::ConnectionRefusedError == e) {
-        METLIBS_LOG_INFO("CoClient: could not connect to coserver, trying to start");
+        METLIBS_LOG_INFO("could not connect to coserver, trying to start");
         tryToStartCoServer();
     } else if (QAbstractSocket::RemoteHostClosedError == e) {
-        METLIBS_LOG_INFO("CoClient: connection to coserver closed unexpectedly, trying to restart");
+        METLIBS_LOG_INFO("connection to coserver closed unexpectedly, trying to restart");
         tryToStartCoServer();
     } else {
-        METLIBS_LOG_INFO("CoClient: error when contacting coserver: " << e);
+        METLIBS_LOG_INFO("error when contacting tcp coserver: " << e);
+    }
+}
+
+void CoClient::localError(QLocalSocket::LocalSocketError e)
+{
+    METLIBS_LOG_SCOPE();
+
+    if (QLocalSocket::PeerClosedError == e) {
+        METLIBS_LOG_INFO("client disconnect");
+    } else {
+        METLIBS_LOG_INFO("error when contacting local coserver: " << e);
     }
 }
 
@@ -448,20 +534,19 @@ void CoClient::tryToStartCoServer()
     if (now < mNextAttemptToStartServer)
         return;
 
-    mNextAttemptToStartServer = now.addSecs(SERVER_START_RETRY_DELAY);
+    int delay_ms = 1000*SERVER_START_RETRY_DELAY + (qrand() & 0x7FF);
+    mNextAttemptToStartServer = now.addMSecs(delay_ms);
 
-    METLIBS_LOG_INFO("CoClient: starting coserver...");
+    METLIBS_LOG_INFO("try starting coserver...");
     QStringList args = QStringList("-d"); ///< -d for dynamicMode
-    if (port > 0)
-        args << "-p" << QString::number(port);
-    
+    args << "-u" << serverUrl.toString(QUrl::RemovePassword);
+
     if (not QProcess::startDetached(serverCommand, args)) {
-        METLIBS_LOG_ERROR("CoClient: could not start server. Make sure the path of coserver4"
-                      " is correctly set in the setup of your client, and try again.");
-        /*emit*/ unableToConnect();
+        METLIBS_LOG_ERROR("could not run server '" << serverCommand << "'");
+        Q_EMIT unableToConnect();
         return;
     }
-    
-    METLIBS_LOG_INFO("CoClient: coserver probably started, will try to connect soon...");
+
+    METLIBS_LOG_INFO("coserver probably started, will try to connect soon...");
     QTimer::singleShot(500, this, SLOT(connectToServer()));
 }

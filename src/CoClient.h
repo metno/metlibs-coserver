@@ -26,126 +26,145 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef _COCLIENT
-#define _COCLIENT
+#ifndef METLIBS_COSERVER_COCLIENT
+#define METLIBS_COSERVER_COCLIENT 1
 
 #include "miMessage.h"
 
-#include <QAbstractSocket>
 #include <QDateTime>
+#include <QLocalSocket>
+#include <QString>
+#include <QTcpSocket>
+#include <QUrl>
 
 #include <map>
+#include <memory>
 
-QT_BEGIN_NAMESPACE
-class QTcpSocket;
-QT_END_NAMESPACE
+class miMessageIO;
 
 class CoClient : public QObject
-{ Q_OBJECT
+{
+    Q_OBJECT
+
 public:
-    CoClient(const char* clientType, const char* host, const char* serverCommand, quint16 port = 0);
+    CoClient(const QString& clientType, const QString& host, quint16 port = 0);
+    CoClient(const QString& clientType, const QUrl& url);
     ~CoClient();
 
-    const std::string& getClientType() const
+    void setUserId(const QString& user);
+    void setBroadcastClient()
+        { setUserId(QString()); }
+
+    const QString& getClientType() const
       { return clientType; }
 
-    /**
-     * Send message to all CoServer client
-     */
-    void setBroadcastClient();
+    const QString& getName() const
+      { return name; }
 
-    /**
-     * Disconnects from the server.
-     */
-    void disconnectFromServer(void);
+    void setName(const QString& name);
 
-    /**
-     * Sends a message to the server.
-     * @param msg The message
-     * @return Returns true upon successful sending, false otherwise
-     */
-    bool sendMessage(miMessage &msg);
+    int getClientId() const
+        { return mId; }
 
-    bool notConnected(void);
-    const std::string& getClientName(int);
-    bool clientTypeExist(const std::string &type);
+    bool notConnected();
+    bool isConnected();
+
+    void setServerUrl(const QUrl& url)
+        { serverUrl = url; }
+
+    void setServerCommand(const QString& sc)
+        { serverCommand = sc; }
+
+    bool sendMessage(const miMessage &msg);
+    bool sendMessage(const miQMessage &qmsg, const ClientIds& to = ClientIds());
+
+    void setSelectedPeerNames(const QStringList& names);
+    const QStringList& getSelectedPeerNames()
+        { return mSelectedPeerNames; }
+
+    ClientIds getClientIds() const;
+    QString getClientType(int id) const;
+    QString getClientName(int id) const;
+
+    enum ClientChange { CLIENT_REGISTERED, CLIENT_NEW, CLIENT_RENAME, CLIENT_GONE, CLIENT_UNREGISTERED };
 
 public Q_SLOTS:
-    /**
-     * Connects to the server.
-     */
-    void connectToServer(void);
-
-private:
-    QTcpSocket *tcpSocket;
-
-    std::string clientType;
-    QString serverCommand;
-    QString host;
-
-    quint32 blockSize;
-    quint16 port;
-    std::string userid;
-
-    QDateTime mNextAttemptToStartServer;
-
-    std::map<int, std::string> clients;
-
-    /**
-     * Adds or removes entries in the list of clients as clients
-     * connects and disconnects.
-     * @param msg Message containing client info
-     */
-    void editClients(const miMessage& msg);
-
-    /**
-     * Read port from file. File has to be located in ~/.diana/diana.port and only contain the port number.
-     */
-    int readPortFromFile();
-
-    /**
-     * Parses /etc/services and extracts portnumber based on username. (env variable USER)
-     * Format in /etc/services
-     * diana-<username>    <port>/tcp    # comment
-     */
-    int readPortFromFile_Services();
+    void connectToServer();
+    void disconnectFromServer();
 
 Q_SIGNALS:
+    void receivedMessage(int from, const miQMessage&);
     void receivedMessage(const miMessage&);
+
+    void clientChange(int clientId, CoClient::ClientChange change);
+
     void addressListChanged();
     void connected();
     void newClient(const std::string&);
+    void newClient(const QString&);
     void unableToConnect();
     void disconnected();
 
 private Q_SLOTS:
-    /**
-     * Read new incoming message.
-     */
+    //! Read new incoming message.
     void readNew();
 
     void connectionEstablished();
 
-    /**
-     * Called when disconnected from server.
-     */
     void connectionClosed();
 
-    /**
-     * Starts coserver if not already running.
-     * @param e Error type
-     */
-    void socketError(QAbstractSocket::SocketError e);
-
-    /**
-     * Debugging function.
-     * Only used if _DEBUG is defined.
-     * @param written The number of bytes written to socket
-     */
-    void printBytesWritten(qint64 written);
+    void tcpError(QAbstractSocket::SocketError e);
+    void localError(QLocalSocket::LocalSocketError e);
 
 private:
+    struct Client {
+        QString type;
+        QString name;
+        bool connected;
+        Client(const QString& t, const QString& n)
+            : type(t), name(n), connected(false) { }
+    };
+
+    // map id -> Client(name, type, connected)
+    typedef std::map<int, Client> clients_t;
+
+private:
+    void initialize(const QString& clientType);
+    void createSocket();
     void tryToStartCoServer();
+
+    void sendClientType();
+    void sendMessageToServer(const miQMessage& qmsg);
+
+    bool messageFromServer(const miQMessage& qmsg);
+    void handleRegisteredClient(const miQMessage& qmsg);
+    void handleUnregisteredClient(const miQMessage& qmsg);
+    void handleNewClient(const miQMessage& qmsg);
+    void handleRemoveClient(const miQMessage& qmsg);
+    void handleRenameClient(const miQMessage& qmsg);
+
+    void emitMessage(int fromId, const miQMessage& qmsg);
+
+    void sendSetPeers();
+
+private:
+    QTcpSocket *tcpSocket;
+    QLocalSocket *localSocket;
+    std::auto_ptr<miMessageIO> io;
+
+    int mId;
+    QString clientType;
+    QString userid;
+    QString name;
+
+    QStringList mSelectedPeerNames;
+
+    clients_t clients;
+
+    QString serverCommand;
+    QUrl serverUrl;
+
+    QDateTime mNextAttemptToStartServer;
 };
 
-#endif
+#endif // METLIBS_COSERVER_COCLIENT

@@ -24,3 +24,4 @@ Makefile.in
 /debian/metlibs-coserver-dev
 /debian/files
 /src/*.moc.cc
+/compile

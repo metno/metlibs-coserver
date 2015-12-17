@@ -36,6 +36,7 @@
 
 class CoClient;
 class miMessage;
+class miQMessage;
 
 class ClientButton : public QPushButton
 { Q_OBJECT
@@ -51,7 +52,7 @@ public:
      * @param server Which server to use
      * @param parent Parent widget
      */
-    ClientButton(const QString & text, const QString & server, QWidget * parent);
+    ClientButton(const QString& clientType, const QString& serverCommand, QWidget * parent);
 
     /* This button re-uses an existing CoClient object. */
     ClientButton(CoClient* client, QWidget * parent);
@@ -63,8 +64,14 @@ public:
      * @param msg The message to be sent
      */
     void sendMessage(miMessage &msg);
+    void sendMessage(miQMessage &qmsg);
 
-    const std::string& getClientName(int id);
+    // -- begin old api --
+    std::string getClientName(int id); // removed const& on return type; returns client type, not name
+    bool clientTypeExist(const std::string &type);
+    bool clientTypeExist(const char* type) // added for disambiguation
+        { return clientTypeExist(QString(type)); }
+    // -- end old api --
 
     /**
      * Sends a request to the server to search for a
@@ -72,7 +79,7 @@ public:
      * clients.
      * @param type The type of client(s) to search for
      */
-    bool clientTypeExist(const std::string &type);
+    bool clientTypeExist(const QString &type);
 
     /**
      * Sets the text-label on the button to label.
@@ -80,7 +87,7 @@ public:
      */
     void useLabel(bool label);
 
-    public Q_SLOTS:
+public Q_SLOTS:
     /**
      * Connects to the running coserver if not connected,
      * disconnects if already connected.
@@ -114,7 +121,7 @@ private:
 
 private:
   CoClient* coclient;
-  
+
   //! true iff the coclient object is owned by this ClientButton
   bool isMyClient;
 

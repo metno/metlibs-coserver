@@ -6,9 +6,11 @@ lib_LTLIBRARIES = libcoserver.la
 
 cc_sources= \
 	QLetterCommands.cc \
-	miMessage.cc
+	miMessage.cc \
+	miMessageIO.cc
 
 qt_sources = \
+	ClientSelection.cc \
 	ClientButton.cc \
 	CoClient.cc 
 
@@ -36,14 +38,14 @@ pkg_include_HEADERS = \
 	$(img_sources)
 
 
-libcoserver_la_CPPFLAGS = ${MILOGGER_CPPFLAGS} ${QT4_CPPFLAGS}
+libcoserver_la_CPPFLAGS = ${MILOGGER_CPPFLAGS} ${QUTILITIES_CPPFLAGS} ${QT4_CPPFLAGS}
 libcoserver_la_LDFLAGS  = ${VERSION_INFO}
 
 
 if ENABLE_SHARED_LIBRARY
 
-libcoserver_la_LDFLAGS += ${MILOGGER_LDFLAGS} ${QT4_LDFLAGS}
-libcoserver_la_LIBADD   = ${MILOGGER_LIBS}    ${QT4_LIBS}
+libcoserver_la_LDFLAGS += ${MILOGGER_LDFLAGS} ${QUTILITIES_LDFLAGS} ${QT4_LDFLAGS}
+libcoserver_la_LIBADD   = ${MILOGGER_LIBS}    ${QUTILITIES_LIBS}    ${QT4_LIBS}
 
 endif
 

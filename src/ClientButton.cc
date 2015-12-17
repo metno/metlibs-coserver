@@ -43,40 +43,34 @@
 #include "disconn.xpm"
 #include "unconn.xpm"
 
-#ifdef __WIN32__
-#define METLIBS_LOG_SCOPE(x) /* emtpy */
-#define METLIBS_LOG_ERROR(x) /* emtpy */
-#define METLIBS_LOG_INFO(x)  /* emtpy */
-#define METLIBS_LOG_DEBUG(x) /* emtpy */
-#else
 #define MILOGGER_CATEGORY "coserver.ClientButton"
-#include <miLogger/miLogging.h>
-#endif /* __WIN32__ */
+#include <qUtilities/miLoggingQt.h>
 
 using namespace std;
 
-ClientButton::ClientButton(const QString & name, const QString & server, QWidget * parent)
-  : QPushButton(name, parent)
-  , coclient(new CoClient(name.toLatin1(), "localhost", server.toLatin1()))
-  , isMyClient(true)
-  , uselabel(false)
+ClientButton::ClientButton(const QString& clientType, const QString& serverCommand, QWidget* parent)
+    : QPushButton(clientType, parent)
+    , coclient(new CoClient(clientType, "localhost"))
+    , isMyClient(true)
+    , uselabel(false)
 {
-  initialize();
+    coclient->setServerCommand(serverCommand);
+    initialize();
 }
 
 ClientButton::ClientButton(CoClient* client, QWidget * parent)
-  : QPushButton(QString::fromStdString(client->getClientType()), parent)
-  , coclient(client)
-  , isMyClient(false)
-  , uselabel(false)
+    : QPushButton(client->getClientType(), parent)
+    , coclient(client)
+    , isMyClient(false)
+    , uselabel(false)
 {
-  initialize();
+    initialize();
 }
 
 void ClientButton::initialize()
 {
   connect(this, SIGNAL(clicked()), SLOT(connectToServer()));
-  
+
   connect(coclient, SIGNAL(newClient(const std::string&)), SLOT(setLabel(const std::string&)));
   connect(coclient, SIGNAL(connected()), SLOT(connected()));
   connect(coclient, SIGNAL(unableToConnect()), SLOT(unableToConnect()));
@@ -101,7 +95,7 @@ ClientButton::~ClientButton()
 void ClientButton::connectToServer()
 {
   METLIBS_LOG_SCOPE();
-  
+
   if (coclient->notConnected()) {
     METLIBS_LOG_DEBUG("not connected -> connecting");
     setIcon(QPixmap(disconn_xpm));
@@ -152,7 +146,7 @@ void ClientButton::setLabel(const std::string& name)
     setText("");
   } else if (uselabel ) {
     setIcon(QPixmap(conn_xpm));
-    
+
     /// not useful anymore.. needs refactoring
     setText("");
     //setText(name.c_str());
@@ -164,17 +158,32 @@ void ClientButton::sendMessage(miMessage& msg)
   coclient->sendMessage(msg);
 }
 
-const std::string& ClientButton::getClientName(int id)
+void ClientButton::sendMessage(miQMessage& qmsg)
 {
-  return coclient->getClientName(id);
-}
-
-bool ClientButton::clientTypeExist(const std::string& type)
-{
-  return coclient->clientTypeExist(type);
+  coclient->sendMessage(qmsg);
 }
 
 void ClientButton::useLabel(bool label)
 {
   uselabel = label;
+}
+
+std::string ClientButton::getClientName(int id)
+{
+    return coclient->getClientType(id).toStdString();
+}
+
+bool ClientButton::clientTypeExist(const std::string& type)
+{
+    return clientTypeExist(QString::fromStdString(type));
+}
+
+bool ClientButton::clientTypeExist(const QString& type)
+{
+    const ClientIds ids = coclient->getClientIds();
+    for (ClientIds::const_iterator it = ids.begin(); it != ids.end(); ++it) {
+        if (coclient->getClientType(*it) == type)
+            return true;
+    }
+    return false;
 }
