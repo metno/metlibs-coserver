@@ -3,14 +3,14 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([coserver], [1.1.0], [diana@met.no])
+AC_INIT([coserver], [2.0.0], [diana@met.no])
 AM_INIT_AUTOMAKE([foreign])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_CONFIG_SRCDIR([src/miMessage.h])
 AC_CONFIG_MACRO_DIR([m4])
 
-METNO_SET_VERSION_INFO(1.0.1)
+METNO_SET_VERSION_INFO(2.0.0)
 METNO_PROG_PKG_CONFIG
 METNO_REQUIRE_BOOST
 
