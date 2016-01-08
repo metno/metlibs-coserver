@@ -1,3 +1,9 @@
+metlibs-qt-coserver (2.0.1-1) unstable; urgency=low
+
+  * bugfixes
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Fri, 8 Jan 2016 09:00:09 +0100
+
 metlibs-qt-coserver (2.0.0-1) unstable; urgency=low
 
   * introduce miQMessage, miMessageIO
