@@ -180,10 +180,5 @@ bool ClientButton::clientTypeExist(const std::string& type)
 
 bool ClientButton::clientTypeExist(const QString& type)
 {
-    const ClientIds ids = coclient->getClientIds();
-    for (ClientIds::const_iterator it = ids.begin(); it != ids.end(); ++it) {
-        if (coclient->getClientType(*it) == type)
-            return true;
-    }
-    return false;
+    return coclient->hasClientOfType(type);
 }

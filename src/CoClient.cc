@@ -276,6 +276,16 @@ QString CoClient::getClientType(int id) const
         return QString();
 }
 
+bool CoClient::hasClientOfType(const QString& type) const
+{
+    for (clients_t::const_iterator it = clients.begin(); it != clients.end(); ++it) {
+        if (it->second.type == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
 QString CoClient::getClientName(int id) const
 {
     clients_t::const_iterator it = clients.find(id);

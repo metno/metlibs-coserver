@@ -85,6 +85,7 @@ public:
     ClientIds getClientIds() const;
     QString getClientType(int id) const;
     QString getClientName(int id) const;
+    bool hasClientOfType(const QString& type) const;
 
     enum ClientChange { CLIENT_REGISTERED, CLIENT_NEW, CLIENT_RENAME, CLIENT_GONE, CLIENT_UNREGISTERED };
 
