@@ -26,7 +26,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef METLIBS_COSERVER_CLIENTACTION_H
+#ifndef METLIBS_COSERVER_CLIENTSELECTION_H
 #define METLIBS_COSERVER_CLIENTSELECTION_H 1
 
 #include "CoClient.h"
