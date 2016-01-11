@@ -154,6 +154,7 @@ private Q_SLOTS:
     void onConnected();
     void onDisconnected();
     void onUnableToConnect();
+    void onReceivedId(int id);
     void onClientChange(int id, CoClient::ClientChange what);
     void onReceivedMessage(int fromId, const miQMessage& qmsg);
     void onReceivedMessage(const miMessage&);
@@ -178,6 +179,7 @@ private:
     clientActions_t::iterator findActionForClientName(const QString& name);
 
     void updateConnectActions(QIcon icon, QString text, QString toolTip);
+    void updateRenameClientText();
 
 private:
     CoClient* coclient;

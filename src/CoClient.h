@@ -101,6 +101,7 @@ Q_SIGNALS:
 
     void addressListChanged();
     void connected();
+    void receivedId(int id);
     void newClient(const std::string&);
     void newClient(const QString&);
     void unableToConnect();

@@ -251,6 +251,8 @@ void ClientSelection::initialize()
             this, SLOT(onReceivedMessage(int, const miQMessage&)));
     QObject::connect(coclient, SIGNAL(receivedMessage(const miMessage&)),
             this, SLOT(onReceivedMessage(const miMessage&)));
+    QObject::connect(coclient, SIGNAL(receivedId(int)),
+            this, SLOT(onReceivedId(int)));
 
     if (coclient->isConnected())
         onConnected();
@@ -298,6 +300,7 @@ void ClientSelection::onDisconnected()
 {
   METLIBS_LOG_SCOPE();
 
+  updateRenameClientText();
   updateConnectActions(QPixmap(disconn_xpm), tr("Connect"), tr("Disconnected"));
 
   Q_EMIT disconnected();
@@ -514,9 +517,28 @@ void ClientSelection::setName(const QString& name)
     if (name == getClientName())
         return;
 
-    mActionRenameClient->setText(name);
     coclient->setName(name);
+    updateRenameClientText();
     Q_EMIT renamed(name);
+}
+
+void ClientSelection::onReceivedId(int id)
+{
+    updateRenameClientText();
+}
+
+void ClientSelection::updateRenameClientText()
+{
+    METLIBS_LOG_SCOPE();
+    QString text = getClientName();
+    int id = coclient->getClientId();
+    if (id > 0) {
+        text += " [";
+        text += QString::number(id);
+        text += "]";
+    }
+
+    mActionRenameClient->setText(text);
 }
 
 QString ClientSelection::getClientName() const

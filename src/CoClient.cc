@@ -346,6 +346,7 @@ void CoClient::handleRegisteredClient(const miQMessage& qmsg)
         if (idOk) {
             mId = myId;
             METLIBS_LOG_INFO("received my id " << mId);
+            Q_EMIT receivedId(mId);
         } else {
             METLIBS_LOG_WARN("could not parse id from '" << qmsg.getCommonValue(idxMyId) << "'");
         }
