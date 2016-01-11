@@ -1,3 +1,9 @@
+metlibs-qt-coserver (2.0.2-1) unstable; urgency=low
+
+  * show client id in rename action
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Mon, 11 Jan 2016 09:00:09 +0100
+
 metlibs-qt-coserver (2.0.1-1) unstable; urgency=low
 
   * bugfixes
