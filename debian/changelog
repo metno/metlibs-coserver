@@ -1,3 +1,9 @@
+metlibs-qt-coserver (2.0.2-2) unstable; urgency=low
+
+  * fix+update debian/control Depends
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Thu, 25 Feb 2016 09:00:09 +0100
+
 metlibs-qt-coserver (2.0.2-1) unstable; urgency=low
 
   * show client id in rename action
