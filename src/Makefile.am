@@ -33,9 +33,9 @@ libcoserver_la_SOURCES = $(cc_sources) $(qt_sources)
 pkg_includedir = ${includedir}/coserver
 
 pkg_include_HEADERS = \
-	$(cc_sources:.cc=.h)\
-	$(qt_sources:.cc=.h)\
-	$(img_sources)
+	$(cc_sources:.cc=.h) \
+	$(qt_sources:.cc=.h) \
+	coserverVersion.h
 
 
 libcoserver_la_CPPFLAGS = ${MILOGGER_CPPFLAGS} ${QUTILITIES_CPPFLAGS} ${QT4_CPPFLAGS}

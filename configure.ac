@@ -3,7 +3,8 @@
 #
 
 AC_PREREQ(2.59)
-AC_INIT([coserver], [2.0.2], [diana@met.no])
+# version number must be in sync with src/coserverVersion.h
+AC_INIT([coserver], [2.0.3], [diana@met.no])
 AM_INIT_AUTOMAKE([foreign])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
