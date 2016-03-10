@@ -106,7 +106,7 @@ void ClientButton::connectToServer()
     coclient->disconnectFromServer();
     setToolTip("Disconnected");
     setLabel("noClient");
-    /*emit*/ connectionClosed();
+    Q_EMIT connectionClosed();
   }
 }
 
@@ -115,7 +115,7 @@ void ClientButton::connected()
   METLIBS_LOG_SCOPE();
   setIcon(QPixmap(conn_xpm));
   setToolTip("Connected");
-  /*emit*/ connectedToServer();
+  Q_EMIT connectedToServer();
 }
 
 void ClientButton::disconnected()
@@ -123,7 +123,7 @@ void ClientButton::disconnected()
   METLIBS_LOG_SCOPE();
   setIcon(QPixmap(unconn_xpm));
   setToolTip("Disconnected from CoServer");
-  /*emit*/ connectionClosed();
+  Q_EMIT connectionClosed();
 }
 
 void ClientButton::unableToConnect()
