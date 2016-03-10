@@ -39,7 +39,9 @@ class miMessage;
 class miQMessage;
 
 class ClientButton : public QPushButton
-{ Q_OBJECT
+{
+    Q_OBJECT
+
 public:
     /**
      * This button starts a new client and connects to the running coserver.

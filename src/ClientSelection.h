@@ -46,7 +46,8 @@ class QLineEdit;
 class QWidget;
 
 class ClientAction : public QAction
-{ Q_OBJECT
+{
+    Q_OBJECT
 
 public:
     ClientAction(int clientId, const QString& name, QObject* parent=0);
@@ -81,7 +82,8 @@ private:
 // ========================================================================
 
 class ClientRenameDialog : public QDialog
-{ Q_OBJECT
+{
+    Q_OBJECT
 
 public:
     ClientRenameDialog(QWidget* parent=0);
@@ -105,7 +107,8 @@ private:
 // ========================================================================
 
 class ClientSelection : public QObject
-{ Q_OBJECT
+{
+    Q_OBJECT
 
 public:
     ClientSelection(const QString& clientType, QWidget* parent=0);
