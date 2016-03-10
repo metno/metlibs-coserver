@@ -1,4 +1,4 @@
-metlibs-qt-coserver (2.0.3-1) unstable; urgency=low
+metlibs-qt-coserver (2.0.4-1) unstable; urgency=low
 
   * added header with version info
   * do not install xpm files
