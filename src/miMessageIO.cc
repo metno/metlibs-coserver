@@ -59,7 +59,7 @@ bool miMessageIO::read(int& fromId, ClientIds& toIds, miQMessage& qmsg)
         in >> version;
         if (mProtocolVersion < version)
             mProtocolVersion = version;
-        if (version = 1) {
+        if (version == 1) {
             readV1(in, fromId, toIds, qmsg);
         } else {
             METLIBS_LOG_ERROR("protocol version " << version << " not supported");
