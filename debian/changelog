@@ -1,3 +1,9 @@
+metlibs-qt-coserver (2.0.5-1) unstable; urgency=low
+
+  * minor improvements to CoClient class
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Tue, 12 Apr 2016 14:00:00 +0200
+
 metlibs-qt-coserver (2.0.4-1) unstable; urgency=low
 
   * added header with version info
