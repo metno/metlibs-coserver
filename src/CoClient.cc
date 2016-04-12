@@ -91,7 +91,8 @@ QString getUserId()
 
 } // namespace anonymous
 
-CoClient::CoClient(const QString& ct, const QString& h, quint16 port)
+CoClient::CoClient(const QString& ct, const QString& h, quint16 port, QObject* parent)
+    : QObject(parent)
 {
     initialize(ct);
 
@@ -104,11 +105,11 @@ CoClient::CoClient(const QString& ct, const QString& h, quint16 port)
         serverUrl.setHost(h);
     }
     serverUrl.setPort(port);
-
 }
 
-CoClient::CoClient(const QString& ct, const QUrl& url)
-    : serverUrl(url)
+CoClient::CoClient(const QString& ct, const QUrl& url, QObject* parent)
+    : QObject(parent)
+    , serverUrl(url)
 {
     initialize(ct);
 }

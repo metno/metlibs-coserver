@@ -47,8 +47,8 @@ class CoClient : public QObject
     Q_OBJECT
 
 public:
-    CoClient(const QString& clientType, const QString& host, quint16 port = 0);
-    CoClient(const QString& clientType, const QUrl& url);
+    CoClient(const QString& clientType, const QString& host, quint16 port = 0, QObject* parent = 0);
+    CoClient(const QString& clientType, const QUrl& url, QObject* parent = 0);
     ~CoClient();
 
     void setUserId(const QString& user);
