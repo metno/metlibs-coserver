@@ -125,6 +125,7 @@ void CoClient::initialize(const QString& ct)
     mId = -1;
     name = clientType = ct;
     serverCommand = "coserver4";
+    mAttemptToStartServer = true;
     mNextAttemptToStartServer = QDateTime::currentDateTime().addSecs(-30);
 
     userid = safe_getenv("COSERVER_USER");
@@ -541,6 +542,9 @@ void CoClient::localError(QLocalSocket::LocalSocketError e)
 
 void CoClient::tryToStartCoServer()
 {
+    if (!mAttemptToStartServer)
+        return;
+
     const QDateTime now = QDateTime::currentDateTime();
     if (now < mNextAttemptToStartServer)
         return;

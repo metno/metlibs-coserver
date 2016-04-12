@@ -55,6 +55,9 @@ public:
     void setBroadcastClient()
         { setUserId(QString()); }
 
+    void setAttemptToStartServer(bool start)
+        { mAttemptToStartServer = start; }
+
     const QString& getClientType() const
       { return clientType; }
 
@@ -166,6 +169,7 @@ private:
     QString serverCommand;
     QUrl serverUrl;
 
+    bool mAttemptToStartServer;
     QDateTime mNextAttemptToStartServer;
 };
 
