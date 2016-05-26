@@ -39,6 +39,7 @@
 #include <QMenu>
 #include <QPixmap>
 #include <QPushButton>
+#include <QRegExpValidator>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -48,6 +49,20 @@
 
 #define MILOGGER_CATEGORY "coserver.ClientSelection"
 #include <qUtilities/miLoggingQt.h>
+
+namespace { // anonymous
+const QRegExp allowedSuffix("[A-Za-z0-9-]+");
+
+QString buildClientName(const QString& prefix, const QString& suffix)
+{
+    if (suffix.isEmpty())
+        return prefix;
+    else
+        return prefix + "-" + suffix;
+}
+} // anonymous namespace
+
+// ========================================================================
 
 ClientAction::ClientAction(int id, const QString& name, QObject* parent)
     : QAction(parent)
@@ -100,59 +115,61 @@ void ClientAction::onToggled(bool checked)
 
 // ########################################################################
 
-ClientRenameDialog::ClientRenameDialog(QWidget* parent)
+ClientRenameDialog::ClientRenameDialog(const QString& prefix, const QString& suffix, QWidget* parent)
     : QDialog(parent)
-    , mAllowed("[\\w\\d+-]+")
+    , mPrefix(prefix.trimmed())
 {
     setModal(true);
     setWindowTitle(tr("Change name"));
 
     QLabel* label = new QLabel(tr("Enter new coserver name:"));
-    mEdit = new QLineEdit(this);
+    mPrefixLabel = new QLabel("client", this);
+    mSuffixEdit = new QLineEdit(this);
+    mSuffixEdit->setMaxLength(128);
+    mSuffixEdit->setValidator(new QRegExpValidator(allowedSuffix, this));
+    const QString help = tr("Use A-Z, a-z, 0-9, -");
+    mSuffixEdit->setPlaceholderText(help);
+    mSuffixEdit->setToolTip(help);
     mButtons = new QDialogButtonBox(QDialogButtonBox::Cancel | QDialogButtonBox::Ok, Qt::Horizontal, this);
 
-    QBoxLayout* layout = new QVBoxLayout();
-    layout->addWidget(label);
-    layout->addWidget(mEdit);
-    layout->addWidget(mButtons);
+    QGridLayout* layout = new QGridLayout();
+    layout->addWidget(label, 0, 0, 1, 2);
+    layout->addWidget(mPrefixLabel, 1, 0);
+    layout->addWidget(mSuffixEdit, 1, 1);
+    layout->addWidget(mButtons, 2, 0, 1, 2);
     setLayout(layout);
 
-    connect(mEdit, SIGNAL(textChanged(const QString&)),
+    connect(mSuffixEdit, SIGNAL(textChanged(const QString&)),
             SLOT(onTextChanged()));
     connect(mButtons, SIGNAL(accepted()),
             SLOT(accept()));
     connect(mButtons, SIGNAL(rejected()),
             SLOT(reject()));
+
+    QString sfx = suffix.trimmed();
+    if (!sfx.isEmpty() && !allowedSuffix.exactMatch(sfx))
+        sfx = QString();
+    mSuffixEdit->setText(sfx);
+    onTextChanged(); // update mPrefixLabel
 }
 
-void ClientRenameDialog::setPattern(const QRegExp& allowed)
+QString ClientRenameDialog::getClientNameSuffix() const
 {
-    mAllowed = allowed;
-    onTextChanged();
-}
-
-void ClientRenameDialog::setName(const QString& name)
-{
-    mEdit->setText(name);
-    onTextChanged();
-}
-
-QString ClientRenameDialog::getName()
-{
-    return mEdit->text();
+    return mSuffixEdit->text();
 }
 
 void ClientRenameDialog::onTextChanged()
 {
-    const bool ok = isAllowed(getName());
+    bool ok;
+    const QString suffix = getClientNameSuffix();
+    if (suffix.isEmpty()) {
+        mPrefixLabel->setText(mPrefix);
+        ok = true;
+    } else {
+        mPrefixLabel->setText(mPrefix + "-");
+        ok = allowedSuffix.exactMatch(suffix);
+    }
     mButtons->button(QDialogButtonBox::Ok)->setEnabled(ok);
-}
-
-bool ClientRenameDialog::isAllowed(const QString& name)
-{
-    if (name.trimmed().isEmpty())
-        return false;
-    return mAllowed.exactMatch(name);
 }
 
 // ########################################################################
@@ -235,8 +252,6 @@ void ClientSelection::initialize()
     for (clientActions_t::iterator it = clientActions.begin(); it != clientActions.end(); ++it)
         menuMenu->addAction(*it);
     mActionForMenuBar->setMenu(menuMenu);
-
-    mRenameDialog = new ClientRenameDialog(static_cast<QWidget*>(parent()));
 
     // connect signals from coclient
     QObject::connect(coclient, SIGNAL(clientChange(int, CoClient::ClientChange)),
@@ -498,24 +513,28 @@ void ClientSelection::sendMessage(const miQMessage &qmsg, int toId)
     sendMessage(qmsg, clientId(toId));
 }
 
-void ClientSelection::setNamePattern(const QRegExp& allowed)
-{
-    mRenameDialog->setPattern(allowed);
-}
-
 void ClientSelection::onRenameRequested()
 {
     METLIBS_LOG_SCOPE();
-    mRenameDialog->setName(getClientName());
-    if (mRenameDialog->exec() == QDialog::Accepted)
-        setName(mRenameDialog->getName());
+
+    const QString prefix = getClientNamePrefix();
+    ClientRenameDialog rename(prefix, getClientNameSuffix(), static_cast<QWidget*>(parent()));
+    if (rename.exec() == QDialog::Accepted) {
+        setClientName(buildClientName(prefix, rename.getClientNameSuffix()));
+    }
 }
 
-void ClientSelection::setName(const QString& name)
+void ClientSelection::setClientName(const QString& name)
 {
     METLIBS_LOG_SCOPE();
     if (name == getClientName())
         return;
+
+    const QString prefix = getClientNamePrefix();
+    if (!ClientSelection::isAllowedClientName(prefix, name)) {
+        METLIBS_LOG_WARN("prefix change (from " << prefix << ") or illegal name (" << name << "), no rename");
+        return;
+    }
 
     coclient->setName(name);
     updateRenameClientText();
@@ -541,12 +560,47 @@ void ClientSelection::updateRenameClientText()
     mActionRenameClient->setText(text);
 }
 
+QString ClientSelection::getClientName(int id) const
+{
+    return coclient->getClientName(id);
+}
+
 QString ClientSelection::getClientName() const
 {
     return coclient->getName();
 }
 
-QString ClientSelection::getClientName(int id) const
+QString ClientSelection::getClientNamePrefix() const
 {
-    return coclient->getClientName(id);
+    return coclient->getClientType().toLower();
+}
+
+QString ClientSelection::getClientNameSuffix() const
+{
+    return ClientSelection::getClientNameSuffix(getClientNamePrefix(), getClientName());
+}
+
+// static
+QString ClientSelection::getClientNameSuffix(const QString& prefix, const QString& name)
+{
+    if (name == prefix)
+        return "";
+    if (name.length() < prefix.length() + 2 || name.at(prefix.length()) != QChar('-')) {
+        METLIBS_LOG_WARN("illegal name '" << name << "' for prefix '" << prefix << "'");
+        return "";
+    }
+    return name.mid(prefix.length()+1);
+}
+
+// static
+bool ClientSelection::isAllowedClientName(const QString& prefix, const QString& name)
+{
+    if (name == prefix)
+        return true;
+    if (name.length() < prefix.length() + 2)
+        return false;
+    if (name.at(prefix.length()) != QChar('-'))
+        return false;
+    const QString suffix = name.mid(prefix.length()+1);
+    return allowedSuffix.exactMatch(suffix);
 }

@@ -42,6 +42,7 @@ class miMessage;
 class miQMessage;
 
 class QDialogButtonBox;
+class QLabel;
 class QLineEdit;
 class QWidget;
 
@@ -86,22 +87,18 @@ class ClientRenameDialog : public QDialog
     Q_OBJECT
 
 public:
-    ClientRenameDialog(QWidget* parent=0);
-    void setName(const QString& name);
-    QString getName();
+    ClientRenameDialog(const QString& prefix, const QString& suffix, QWidget* parent);
 
-    void setPattern(const QRegExp& allowed);
+    QString getClientNameSuffix() const;
 
 private Q_SLOTS:
     void onTextChanged();
 
 private:
-    bool isAllowed(const QString& name);
-
-private:
-    QLineEdit* mEdit;
+    QString mPrefix;
+    QLabel* mPrefixLabel;
+    QLineEdit* mSuffixEdit;
     QDialogButtonBox* mButtons;
-    QRegExp mAllowed;
 };
 
 // ========================================================================
@@ -132,18 +129,30 @@ public:
     void sendMessage(const miQMessage &qmsg, const ClientIds& toIds = ClientIds());
     void sendMessage(const miQMessage &qmsg, int toId);
 
+    /** Get this client's name. */
     QString getClientName() const;
-    QString getClientName(int id) const;
 
-    void setNamePattern(const QRegExp& allowed);
+    /** Get this client's name suffix. */
+    QString getClientNameSuffix() const;
+
+    /** Get the name of the client with the given id. */
+    QString getClientName(int id) const;
 
     void setSelectedClientNames(const QStringList& names);
     QStringList getSelectedClientNames();
 
+    /** Extract suffix from name given the prefix. */
+    static QString getClientNameSuffix(const QString& prefix, const QString& name);
+
+    /** Check if prefix and name are valid. */
+    static bool isAllowedClientName(const QString& prefix, const QString& name);
+
 public Q_SLOTS:
     void connect();
     void disconnect();
-    void setName(const QString& name);
+
+    /** Set this client's name, but only if it is valid. */
+    void setClientName(const QString& name);
 
 Q_SIGNALS:
     void receivedMessage(int fromId, const miQMessage&);
@@ -172,6 +181,7 @@ private:
 
 private:
     void initialize();
+    QString getClientNamePrefix() const;
 
     void sendUpdatedPeerList();
 
@@ -198,8 +208,6 @@ private:
     clientActions_t clientActions;
 
     int mUpdatingClientActions; //! protect against too many sendSetPeers
-
-    ClientRenameDialog* mRenameDialog;
 };
 
 #endif // METLIBS_COSERVER_CLIENTSELECTION_H
