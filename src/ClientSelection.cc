@@ -302,7 +302,9 @@ void ClientSelection::onConnected()
 {
   METLIBS_LOG_SCOPE();
 
-  updateConnectActions(QPixmap(conn_xpm), tr("Disconnect"), tr("Connected"));
+  const QUrl serverUrl = coclient->getConnectedServerUrl();
+  const QString url = serverUrl.isValid() ? serverUrl.toString() : "?";
+  updateConnectActions(QPixmap(conn_xpm), tr("Disconnect"), tr("Connected to %1").arg(url));
 
   Q_EMIT connected();
 }
