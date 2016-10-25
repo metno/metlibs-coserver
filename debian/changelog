@@ -1,3 +1,10 @@
+metlibs-qt-coserver (2.2.0-1) unstable; urgency=low
+
+  * server url list
+  * workaround for bug in coserver4 < 5.1.2
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Tue, 25 Oct 2016 08:00:00 +0200
+
 metlibs-qt-coserver (2.1.0-1) unstable; urgency=low
 
   * replace client rename dialog
