@@ -495,7 +495,7 @@ bool CoClient::sendMessage(const miMessage &msg)
     miQMessage qmsg;
     convert(msg, from, to, qmsg);
     ClientIds receivers;
-    if (to != -1)
+    if (to != qmstrings::all/* && to != qmstrings::default_id*/)
         receivers.insert(to);
     return sendMessage(qmsg, receivers);
 }

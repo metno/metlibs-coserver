@@ -207,7 +207,7 @@ void convert(const miMessage& msg, int& from, int& to, miQMessage& qmsg)
     qmsg.setData(dataDesc, dataRows);
 }
 
-std::ostream& operator<< (std::ostream& out , const miQMessage& qmsg)
+std::ostream& operator<< (std::ostream& out, const miQMessage& qmsg)
 {
     out << "command='" << qmsg.command() << "'\n"
         << " commondesc=" << qmsg.getCommonDesc() << '\n'
