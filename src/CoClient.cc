@@ -36,6 +36,8 @@
 #include <QtCore/QStringList>
 #include <QtCore/QTimer>
 
+#include <QtNetwork/QHostInfo>
+
 #define MILOGGER_CATEGORY "coserver.CoClient"
 #include <qUtilities/miLoggingQt.h>
 
@@ -65,8 +67,6 @@ QString safe_getenv(const char* var)
     return v;
 }
 
-const int SERVER_START_RETRY_DELAY = 15;
-
 QString getUserId()
 {
 #ifdef __WIN32__
@@ -89,29 +89,89 @@ QString getUserId()
 #endif
 }
 
+const char COSERVER_HOST[] = "COSERVER_HOST";
+const char COSERVER_URLS[] = "COSERVER_URLS";
+const QString SCHEME_CO4 = "co4";
+const QString SCHEME_LOCAL = "local";
+const QString LOCALHOST = "localhost";
+const int TIMEOUT_RECONNECT_MS = 1000;
+
+QString joinArgs(const QStringList& args)
+{
+    QString joined;
+    for (int i=0; i<args.count(); ++i) {
+        if (i>0)
+            joined += " ";
+        joined += "\"";
+        const QString& a = args.at(i);
+        if (a.contains("\"")) {
+            QString quoted = a;
+            quoted.replace("\"", "\\\"");
+            joined += quoted;
+        } else {
+            joined += a;
+        }
+        joined += "\"";
+    }
+    return joined;
+}
+
+QList<QUrl> generateServerUrl(const QString& h="", quint16 port=0)
+{
+    QUrl serverUrl;
+    serverUrl.setScheme(SCHEME_CO4);
+    if (getenv(COSERVER_HOST) != NULL) {
+        serverUrl.setHost(getenv(COSERVER_HOST));
+    } else if (!h.isEmpty()) {
+        serverUrl.setHost(h);
+    } else {
+        serverUrl.setHost(LOCALHOST);
+    }
+    if (port != 0)
+        serverUrl.setPort(port);
+    return QList<QUrl>() << serverUrl;
+}
+
+QList<QUrl> generateServerUrls()
+{
+    QList<QUrl> serverUrls;
+    if (getenv(COSERVER_URLS) != NULL) {
+        const QStringList urls = QString(getenv(COSERVER_URLS)).split(" ");
+        for (int i=0; i<urls.size(); ++i) {
+            const QUrl u(urls.at(i));
+            if (u.isValid())
+                serverUrls << u;
+        }
+    }
+    if (serverUrls.isEmpty())
+        serverUrls << generateServerUrl();
+    return serverUrls;
+}
+
 } // namespace anonymous
+
+CoClient::CoClient(const QString& ct, QObject* parent)
+    : QObject(parent)
+{
+    initialize(ct, generateServerUrls());
+}
 
 CoClient::CoClient(const QString& ct, const QString& h, quint16 port, QObject* parent)
     : QObject(parent)
 {
-    initialize(ct);
-
-    if (port == 0)
-        port = qmstrings::port;
-    serverUrl.setScheme("co4");
-    if (getenv("COSERVER_HOST") != NULL) {
-        serverUrl.setHost(getenv("COSERVER_HOST"));
-    } else {
-        serverUrl.setHost(h);
-    }
-    serverUrl.setPort(port);
+    initialize(ct, generateServerUrl(h, port));
 }
 
 CoClient::CoClient(const QString& ct, const QUrl& url, QObject* parent)
     : QObject(parent)
-    , serverUrl(url)
 {
-    initialize(ct);
+    initialize(ct, QList<QUrl>() << url);
+}
+
+CoClient::CoClient(const QString& ct, const QList<QUrl>& urls, QObject* parent)
+    : QObject(parent)
+{
+    initialize(ct, urls);
 }
 
 CoClient::~CoClient()
@@ -119,15 +179,44 @@ CoClient::~CoClient()
     METLIBS_LOG_SCOPE();
 }
 
-void CoClient::initialize(const QString& ct)
+void CoClient::initialize(const QString& ct, const QList<QUrl>& urls)
 {
+    METLIBS_LOG_SCOPE();
+    for (int i=0; i<urls.size(); ++i) {
+        QUrl u = urls.at(i);
+        bool accept = !u.hasFragment() && !u.hasQuery();
+        if (u.scheme().isEmpty()) {
+            const QString& p = u.path(), h = u.host();
+            if (h.isEmpty() && !p.isEmpty() && !p.contains("/")) {
+                u.setScheme(SCHEME_CO4);
+                u.setHost(p);
+                u.setPath("");
+            } else if (!p.isEmpty()) {
+                u.setScheme(SCHEME_LOCAL);
+            } else {
+                accept = false;
+            }
+        }
+        if (u.scheme() == SCHEME_LOCAL && u.port() != -1)
+            accept = false;
+        if (accept) {
+            METLIBS_LOG_DEBUG("server url '" << u.toString() << "'");
+            serverUrls << u;
+        } else {
+            METLIBS_LOG_WARN("invalid url '" << urls.at(i).toString() << "' skipped");
+        }
+    }
+
+    rewindServerList();
+
     tcpSocket = 0;
     localSocket = 0;
+
     mId = -1;
     name = clientType = ct;
+
     serverCommand = "coserver4";
     mAttemptToStartServer = true;
-    mNextAttemptToStartServer = QDateTime::currentDateTime().addSecs(-30);
 
     userid = safe_getenv("COSERVER_USER");
     if (userid.isEmpty())
@@ -139,53 +228,110 @@ void CoClient::setUserId(const QString& user)
     userid = user;
 }
 
-void CoClient::createSocket()
+void CoClient::rewindServerList()
 {
-    QObject* device;
-    if (serverUrl.scheme() == "co4") {
-        tcpSocket = new QTcpSocket(this);
-        io.reset(new miMessageIO(tcpSocket, false));
-        device = tcpSocket;
+    METLIBS_LOG_SCOPE();
+    serverIndex = 0;
+    serverStarting = -1;
+}
 
-        connect(tcpSocket, SIGNAL(error(QAbstractSocket::SocketError)),
-                SLOT(tcpError(QAbstractSocket::SocketError)));
-    } else if (serverUrl.scheme() == "local") {
-        localSocket = new QLocalSocket(this);
-        io.reset(new miMessageIO(localSocket, false));
-        device = localSocket;
+void CoClient::destroySocket()
+{
+    METLIBS_LOG_SCOPE();
+    io.reset(0);
+    if (tcpSocket) {
+        tcpSocket->deleteLater();
+        tcpSocket = 0;
+    }
+    if (localSocket) {
+        localSocket->deleteLater();
+        localSocket = 0;
+    }
+}
 
-        connect(localSocket, SIGNAL(error(QLocalSocket::LocalSocketError)),
-                SLOT(localError(QLocalSocket::LocalSocketError)));
+void CoClient::createSocket(const QUrl& serverUrl)
+{
+    METLIBS_LOG_SCOPE(LOGVAL(serverUrl.toString()));
+    if (serverUrl.scheme() == SCHEME_CO4) {
+        createTcpSocket(serverUrl);
+    } else if (serverUrl.scheme() == SCHEME_LOCAL) {
+        createLocalSocket(serverUrl);
     } else {
         METLIBS_LOG_ERROR("bad server url '" << serverUrl.toString(QUrl::RemovePassword) << "'");
         return;
     }
-    // signals are name based, so it is not a problem to mix classes
-    connect(device, SIGNAL(connected()),
+}
+
+void CoClient::createTcpSocket(const QUrl& serverUrl)
+{
+    METLIBS_LOG_SCOPE();
+    tcpSocket = new QTcpSocket(this);
+    connect(tcpSocket, SIGNAL(error(QAbstractSocket::SocketError)),
+            SLOT(tcpError(QAbstractSocket::SocketError)));
+    connect(tcpSocket, SIGNAL(connected()),
             SLOT(connectionEstablished()));
-    connect(device, SIGNAL(disconnected()),
+    connect(tcpSocket, SIGNAL(disconnected()),
             SLOT(connectionClosed()));
-    connect(device, SIGNAL(readyRead()),
+    connect(tcpSocket, SIGNAL(readyRead()),
             SLOT(readNew()));
+
+    QString host = serverUrl.host();
+    if (host.isEmpty())
+        host = LOCALHOST;
+    const int port = serverUrl.port(qmstrings::port);
+    METLIBS_LOG_INFO("connecting to host '" << host << "' port " << port);
+    tcpSocket->connectToHost(host, port);
+}
+
+
+void CoClient::createLocalSocket(const QUrl& serverUrl)
+{
+    METLIBS_LOG_SCOPE();
+    localSocket = new QLocalSocket(this);
+    connect(localSocket, SIGNAL(error(QLocalSocket::LocalSocketError)),
+            SLOT(localError(QLocalSocket::LocalSocketError)));
+    connect(localSocket, SIGNAL(connected()),
+            SLOT(connectionEstablished()));
+    connect(localSocket, SIGNAL(disconnected()),
+            SLOT(connectionClosed()));
+    connect(localSocket, SIGNAL(readyRead()),
+            SLOT(readNew()));
+
+    const QString& path = serverUrl.path();
+    METLIBS_LOG_INFO("connecting to server '" << path << "'");
+    localSocket->connectToServer(path);
 }
 
 void CoClient::connectToServer()
 {
     METLIBS_LOG_SCOPE();
-    if (!io.get())
-        createSocket();
-    if (tcpSocket) {
-        METLIBS_LOG_INFO("connecting to host '" << serverUrl.host() << "' port " << serverUrl.port());
-        tcpSocket->connectToHost(serverUrl.host(), serverUrl.port());
-    } else if (localSocket) {
-        METLIBS_LOG_INFO("connecting to server '" << serverUrl.path() << "'");
-        localSocket->connectToServer(serverUrl.path());
+    if (tcpSocket || localSocket) {
+        METLIBS_LOG_DEBUG("already connected / connecting");
+        return;
     }
+    rewindServerList();
+    connectServer();
+}
+
+void CoClient::connectServer()
+{
+    METLIBS_LOG_SCOPE();
+    destroySocket();
+    if (serverIndex >= serverUrls.size()) {
+        Q_EMIT unableToConnect();
+        return;
+    }
+    const QUrl& serverUrl = serverUrls.at(serverIndex);
+    createSocket(serverUrl);
 }
 
 void CoClient::disconnectFromServer()
 {
-    tcpSocket->disconnectFromHost();
+    METLIBS_LOG_SCOPE();
+    if (tcpSocket)
+        tcpSocket->disconnectFromHost();
+    else if (localSocket)
+        localSocket->disconnectFromServer();
 }
 
 bool CoClient::notConnected()
@@ -208,6 +354,14 @@ bool CoClient::isConnected()
         return false;
 }
 
+QUrl CoClient::getConnectedServerUrl()
+{
+    if (serverIndex >= 0 && serverIndex < serverUrls.size() && isConnected())
+        return serverUrls.at(serverIndex);
+    else
+        return QUrl();
+}
+
 void CoClient::connectionClosed()
 {
     METLIBS_LOG_SCOPE();
@@ -221,6 +375,7 @@ void CoClient::connectionClosed()
     mId = -1;
 
     Q_EMIT disconnected();
+    destroySocket();
 }
 
 void CoClient::readNew()
@@ -465,6 +620,13 @@ void CoClient::handleRenameClient(const miQMessage& qmsg)
 void CoClient::connectionEstablished()
 {
     METLIBS_LOG_SCOPE();
+    METLIBS_LOG_INFO("start talking to '" << getConnectedServerUrl().toString() << "'");
+
+    QIODevice* device = tcpSocket ? static_cast<QIODevice*>(tcpSocket) : static_cast<QIODevice*>(localSocket);
+    if (!device)
+        return;
+    io.reset(new miMessageIO(device, false));
+
     sendClientType();
     Q_EMIT connected();
 }
@@ -506,7 +668,7 @@ bool CoClient::sendMessage(const miQMessage& qmsg, const ClientIds& to)
     if (!isConnected())
         return false;
 
-    METLIBS_LOG_INFO(LOGVAL(mId) << " protocolVersion=" << io->protocolVersion());
+    METLIBS_LOG_DEBUG(LOGVAL(mId) << " protocolVersion=" << io->protocolVersion());
 
     io->write(-1 /*ignored*/, to, qmsg);
     if (tcpSocket)
@@ -520,49 +682,107 @@ void CoClient::tcpError(QAbstractSocket::SocketError e)
 {
     METLIBS_LOG_SCOPE();
     if (QAbstractSocket::ConnectionRefusedError == e) {
-        METLIBS_LOG_INFO("could not connect to coserver, trying to start");
-        tryToStartCoServer();
+        METLIBS_LOG_INFO("could not connect to tcp coserver");
+        tryToStartOrConnectNext();
     } else if (QAbstractSocket::RemoteHostClosedError == e) {
-        METLIBS_LOG_INFO("connection to coserver closed unexpectedly, trying to restart");
-        tryToStartCoServer();
+        METLIBS_LOG_INFO("connection to tcp coserver closed unexpectedly");
+        tryReconnectAfterTimeout();
     } else {
         METLIBS_LOG_INFO("error when contacting tcp coserver: " << e);
+        tryConnectNextServer();
     }
 }
 
 void CoClient::localError(QLocalSocket::LocalSocketError e)
 {
     METLIBS_LOG_SCOPE();
-
-    if (QLocalSocket::PeerClosedError == e) {
-        METLIBS_LOG_INFO("client disconnect");
+    if (QLocalSocket::ConnectionRefusedError == e || QLocalSocket::ServerNotFoundError == e) {
+        METLIBS_LOG_INFO("could not connect to local coserver");
+        tryToStartOrConnectNext();
+    } else if (QLocalSocket::PeerClosedError == e) {
+        METLIBS_LOG_INFO("connection to local coserver closed unexpectedly");
+        tryReconnectAfterTimeout();
     } else {
         METLIBS_LOG_INFO("error when contacting local coserver: " << e);
+        tryConnectNextServer();
     }
 }
 
-void CoClient::tryToStartCoServer()
+void CoClient::tryReconnectAfterTimeout()
 {
+    METLIBS_LOG_SCOPE();
+    QTimer::singleShot(TIMEOUT_RECONNECT_MS, this, SLOT(connectServer()));
+}
+
+void CoClient::tryConnectNextServer()
+{
+    METLIBS_LOG_SCOPE();
+    serverIndex += 1;
+    serverStarting = -1;
+    connectServer();
+}
+
+void CoClient::tryToStartOrConnectNext()
+{
+    if (!tryToStartCoServer())
+        tryConnectNextServer();
+}
+
+bool CoClient::tryToStartCoServer()
+{
+    METLIBS_LOG_SCOPE();
     if (!mAttemptToStartServer)
-        return;
+        return false;
+    if (serverStarting != -1)
+        return false;
+    if (serverIndex < 0 || serverIndex >= serverUrls.size())
+        return false;
 
-    const QDateTime now = QDateTime::currentDateTime();
-    if (now < mNextAttemptToStartServer)
-        return;
+    QUrl serverUrl = serverUrls.at(serverIndex);
+    if (!isLocalServer(serverUrl)) {
+        METLIBS_LOG_DEBUG("server URL " << serverUrl.toString() << " seems to specify a remote server,"
+                " not trying to start");
+        return false;
+    }
+#if 1
+    // coserver4 < 5.1.2 does not use the default port if not specified
+    if (serverUrl.port() == -1)
+        serverUrl.setPort(qmstrings::port);
+#endif
 
-    int delay_ms = 1000*SERVER_START_RETRY_DELAY + (qrand() & 0x7FF);
-    mNextAttemptToStartServer = now.addMSecs(delay_ms);
+    // coserver4 >= 5.1.2 only listens on the specified address if host is not empty,
+    // while coserver4 < 5.1.2 ignores the address;
+    // we want coserver4 to listen on any address and clear the host name
+    serverUrl.setHost("");
 
-    METLIBS_LOG_INFO("try starting coserver...");
+    serverStarting = serverIndex;
+
+    METLIBS_LOG_INFO("try starting local coserver...");
     QStringList args = QStringList("-d"); ///< -d for dynamicMode
     args << "-u" << serverUrl.toString(QUrl::RemovePassword);
 
-    if (not QProcess::startDetached(serverCommand, args)) {
-        METLIBS_LOG_ERROR("could not run server '" << serverCommand << "'");
-        Q_EMIT unableToConnect();
-        return;
+    METLIBS_LOG_DEBUG("starting command=\"" << serverCommand
+            << "\" args=[" << joinArgs(args) << "]");
+    if (QProcess::startDetached(serverCommand, args)) {
+        tryReconnectAfterTimeout();
+        return true;
+    } else {
+        METLIBS_LOG_ERROR("could not run server command=\"" << serverCommand
+                << "\" args=[" << joinArgs(args) << "]");
+        return false;
     }
+}
 
-    METLIBS_LOG_INFO("coserver probably started, will try to connect soon...");
-    QTimer::singleShot(500, this, SLOT(connectToServer()));
+bool CoClient::isLocalServer(const QUrl& url)
+{
+    if (url.scheme() == SCHEME_LOCAL)
+        return true;
+    if (url.scheme() == SCHEME_CO4) {
+        const QString& host = url.host();
+        if (host.isEmpty() || host == "127.0.0.1" || host == "[::1]")
+            return true;
+        if (host == LOCALHOST || host == QHostInfo::localHostName())
+            return true;
+    }
+    return false;
 }

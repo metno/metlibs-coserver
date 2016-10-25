@@ -31,11 +31,11 @@
 
 #include "miMessage.h"
 
-#include <QDateTime>
-#include <QLocalSocket>
-#include <QString>
-#include <QTcpSocket>
-#include <QUrl>
+#include <QtCore/QList>
+#include <QtCore/QString>
+#include <QtCore/QUrl>
+#include <QtNetwork/QLocalSocket>
+#include <QtNetwork/QTcpSocket>
 
 #include <map>
 #include <memory>
@@ -47,8 +47,10 @@ class CoClient : public QObject
     Q_OBJECT
 
 public:
+    CoClient(const QString& clientType, QObject* parent=0);
     CoClient(const QString& clientType, const QString& host, quint16 port = 0, QObject* parent = 0);
     CoClient(const QString& clientType, const QUrl& url, QObject* parent = 0);
+    CoClient(const QString& clientType, const QList<QUrl>& urls, QObject* parent = 0);
     ~CoClient();
 
     void setUserId(const QString& user);
@@ -72,8 +74,13 @@ public:
     bool notConnected();
     bool isConnected();
 
+    QUrl getConnectedServerUrl();
+
+    void setServerUrls(const QList<QUrl>& urls)
+        { serverUrls = urls; }
+
     void setServerUrl(const QUrl& url)
-        { serverUrl = url; }
+        { serverUrls.clear(); serverUrls << url; }
 
     void setServerCommand(const QString& sc)
         { serverCommand = sc; }
@@ -120,6 +127,7 @@ private Q_SLOTS:
 
     void tcpError(QAbstractSocket::SocketError e);
     void localError(QLocalSocket::LocalSocketError e);
+    void connectServer();
 
 private:
     struct Client {
@@ -134,9 +142,17 @@ private:
     typedef std::map<int, Client> clients_t;
 
 private:
-    void initialize(const QString& clientType);
-    void createSocket();
-    void tryToStartCoServer();
+    void initialize(const QString& clientType, const QList<QUrl>& urls);
+    void createSocket(const QUrl& serverUrl);
+    void createTcpSocket(const QUrl& serverUrl);
+    void createLocalSocket(const QUrl& serverUrl);
+    void destroySocket();
+    void tryToStartOrConnectNext();
+    bool tryToStartCoServer();
+    void tryReconnectAfterTimeout();
+    void tryConnectNextServer();
+    bool isLocalServer(const QUrl& url);
+    void rewindServerList();
 
     void sendClientType();
     void sendMessageToServer(const miQMessage& qmsg);
@@ -167,10 +183,11 @@ private:
     clients_t clients;
 
     QString serverCommand;
-    QUrl serverUrl;
+    QList<QUrl> serverUrls;
+    int serverIndex;
+    int serverStarting;
 
     bool mAttemptToStartServer;
-    QDateTime mNextAttemptToStartServer;
 };
 
 #endif // METLIBS_COSERVER_COCLIENT
