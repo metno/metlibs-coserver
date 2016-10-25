@@ -196,8 +196,6 @@ private:
 
 private:
     CoClient* coclient;
-    //! true iff the coclient object is owned by this ClientButton
-    bool isMyClient;
 
     QAction* mActionForToolButton;
     QAction* mActionForMenuBar;

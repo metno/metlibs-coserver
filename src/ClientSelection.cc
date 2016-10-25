@@ -176,8 +176,7 @@ void ClientRenameDialog::onTextChanged()
 
 ClientSelection::ClientSelection(const QString& clientType, QWidget* parent)
     : QObject(parent)
-    , coclient(new CoClient(clientType, "localhost"))
-    , isMyClient(true)
+    , coclient(new CoClient(clientType, this))
 {
     initialize();
 }
@@ -185,7 +184,6 @@ ClientSelection::ClientSelection(const QString& clientType, QWidget* parent)
 ClientSelection::ClientSelection(CoClient* client, QWidget* parent)
     : QObject(parent)
     , coclient(client)
-    , isMyClient(false)
 {
     initialize();
 }
@@ -278,8 +276,6 @@ void ClientSelection::initialize()
 ClientSelection::~ClientSelection()
 {
   METLIBS_LOG_SCOPE();
-  if (isMyClient)
-    delete coclient;
 }
 
 void ClientSelection::connect()
