@@ -114,7 +114,9 @@ void ClientButton::connected()
 {
   METLIBS_LOG_SCOPE();
   setIcon(QPixmap(conn_xpm));
-  setToolTip("Connected");
+  const QUrl serverUrl = coclient->getConnectedServerUrl();
+  const QString url = serverUrl.isValid() ? serverUrl.toString() : "?";
+  setToolTip(tr("Connected to %1").arg(url));
   Q_EMIT connectedToServer();
 }
 
