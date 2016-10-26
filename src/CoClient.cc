@@ -26,13 +26,20 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "CoClient.h"
 
 #include "miMessage.h"
 #include "miMessageIO.h"
 #include "QLetterCommands.h"
 
+#include <QtCore/QDir>
+#include <QtCore/QFileInfo>
 #include <QtCore/QProcess>
+#include <QtCore/QSettings>
 #include <QtCore/QStringList>
 #include <QtCore/QTimer>
 
@@ -94,6 +101,10 @@ const char COSERVER_URLS[] = "COSERVER_URLS";
 const QString SCHEME_CO4 = "co4";
 const QString SCHEME_LOCAL = "local";
 const QString LOCALHOST = "localhost";
+const QString CLIENT_INI = "client.ini";
+const QString KEY_SERVER_COMMAND = "client/server_command";
+const QString KEY_ATTEMPT_START = "client/attempt_to_start_server";
+const QString KEY_USER_ID = "client/user_id";
 const int TIMEOUT_RECONNECT_MS = 1000;
 
 QString joinArgs(const QStringList& args)
@@ -116,7 +127,15 @@ QString joinArgs(const QStringList& args)
     return joined;
 }
 
-QList<QUrl> generateServerUrl(const QString& h="", quint16 port=0)
+QVariant value(QSettings& settings1, QSettings& settings2, const QString& key, const QVariant& fallback=QVariant())
+{
+    if (settings1.contains(key))
+        return settings1.value(key).toString();
+    else
+        return settings2.value(key, fallback).toString();
+}
+
+QUrl serverUrlFromHostname(const QString& h="", quint16 port=0)
 {
     QUrl serverUrl;
     serverUrl.setScheme(SCHEME_CO4);
@@ -129,23 +148,79 @@ QList<QUrl> generateServerUrl(const QString& h="", quint16 port=0)
     }
     if (port != 0)
         serverUrl.setPort(port);
-    return QList<QUrl>() << serverUrl;
+    return serverUrl;
 }
 
-QList<QUrl> generateServerUrls()
+void addServerUrlsFromIniFile(CoClient::QUrlList& urls, const QString& path)
 {
-    QList<QUrl> serverUrls;
-    if (getenv(COSERVER_URLS) != NULL) {
-        const QStringList urls = QString(getenv(COSERVER_URLS)).split(" ");
-        for (int i=0; i<urls.size(); ++i) {
-            const QUrl u(urls.at(i));
-            if (u.isValid())
-                serverUrls << u;
+    METLIBS_LOG_SCOPE("trying to read servers from file '" << path << "'");
+    QSettings settings(path, QSettings::IniFormat);
+    for (int i=0; true; ++i) {
+        const QString key = QString("servers/server_%1").arg(i);
+        if (settings.contains(key)) {
+            const QString u = settings.value(key).toString().trimmed();
+            METLIBS_LOG_DEBUG("adding server url '" << u << "' from key '" << key << "'");
+            urls << QUrl(u);
+        } else if (i > 16) {
+            break;
         }
     }
-    if (serverUrls.isEmpty())
-        serverUrls << generateServerUrl();
-    return serverUrls;
+}
+
+void addServerUrlsFromUrlString(CoClient::QUrlList& urls, const QString& coserver_urls, const QString& sep = " ")
+{
+    const QStringList coserver_url_list = coserver_urls.split(sep);
+    for (int i=0; i<coserver_url_list.size(); ++i) {
+        const QUrl u(coserver_url_list.at(i));
+        if (u.isValid())
+            urls << u;
+    }
+}
+
+void addServerUrlsFromHostString(CoClient::QUrlList& urls, const QString& coserver_host)
+{
+    if (!coserver_host.isEmpty())
+        urls << QUrl(coserver_host);
+}
+
+CoClient::QUrlList serverUrlsFromEnviroment()
+{
+    CoClient::QUrlList urls;
+    addServerUrlsFromUrlString(urls, safe_getenv(COSERVER_URLS));
+    addServerUrlsFromHostString(urls, safe_getenv(COSERVER_HOST));
+    return urls;
+}
+
+QString userClientIni()
+{
+    QDir dot_coserver = QDir::home();
+    dot_coserver.cd("." PACKAGE_NAME);
+    return QFileInfo(dot_coserver, CLIENT_INI).filePath();
+}
+
+QString systemClientIni()
+{
+#if defined(PKGCONFDIR)
+    QDir etc_coserver(PKGCONFDIR);
+    return QFileInfo(etc_coserver, CLIENT_INI).filePath();
+#else  // !PKGCONFDIR
+    return QString();
+#endif // !PKGCONFDIR
+}
+
+CoClient::QUrlList defaultServerUrls()
+{
+    CoClient::QUrlList urls = serverUrlsFromEnviroment();
+    if (urls.isEmpty()) {
+        addServerUrlsFromIniFile(urls, userClientIni());
+    }
+    if (urls.isEmpty()) {
+        addServerUrlsFromIniFile(urls, systemClientIni());
+    }
+    if (urls.isEmpty()) {
+        urls << serverUrlFromHostname();
+    }
+    return urls;
 }
 
 } // namespace anonymous
@@ -153,25 +228,43 @@ QList<QUrl> generateServerUrls()
 CoClient::CoClient(const QString& ct, QObject* parent)
     : QObject(parent)
 {
-    initialize(ct, generateServerUrls());
+    initialize(ct);
+
+    setServerUrls(defaultServerUrls());
 }
 
 CoClient::CoClient(const QString& ct, const QString& h, quint16 port, QObject* parent)
     : QObject(parent)
 {
-    initialize(ct, generateServerUrl(h, port));
+    initialize(ct);
+
+    QUrlList urls = serverUrlsFromEnviroment();
+    if (urls.isEmpty())
+        urls << serverUrlFromHostname(h, port);
+    setServerUrls(urls);
 }
 
 CoClient::CoClient(const QString& ct, const QUrl& url, QObject* parent)
     : QObject(parent)
 {
-    initialize(ct, QList<QUrl>() << url);
+    initialize(ct);
+
+    QUrlList urls = serverUrlsFromEnviroment();
+    if (urls.isEmpty())
+        urls << url;
+    setServerUrls(urls);
 }
 
 CoClient::CoClient(const QString& ct, const QList<QUrl>& urls, QObject* parent)
     : QObject(parent)
 {
-    initialize(ct, urls);
+    initialize(ct);
+
+    const QUrlList envUrls = serverUrlsFromEnviroment();
+    if (!envUrls.isEmpty())
+        setServerUrls(envUrls);
+    else
+        setServerUrls(urls);
 }
 
 CoClient::~CoClient()
@@ -179,35 +272,9 @@ CoClient::~CoClient()
     METLIBS_LOG_SCOPE();
 }
 
-void CoClient::initialize(const QString& ct, const QList<QUrl>& urls)
+void CoClient::initialize(const QString& ct)
 {
     METLIBS_LOG_SCOPE();
-    for (int i=0; i<urls.size(); ++i) {
-        QUrl u = urls.at(i);
-        bool accept = !u.hasFragment() && !u.hasQuery();
-        if (u.scheme().isEmpty()) {
-            const QString& p = u.path(), h = u.host();
-            if (h.isEmpty() && !p.isEmpty() && !p.contains("/")) {
-                u.setScheme(SCHEME_CO4);
-                u.setHost(p);
-                u.setPath("");
-            } else if (!p.isEmpty()) {
-                u.setScheme(SCHEME_LOCAL);
-            } else {
-                accept = false;
-            }
-        }
-        if (u.scheme() == SCHEME_LOCAL && u.port() != -1)
-            accept = false;
-        if (accept) {
-            METLIBS_LOG_DEBUG("server url '" << u.toString() << "'");
-            serverUrls << u;
-        } else {
-            METLIBS_LOG_WARN("invalid url '" << urls.at(i).toString() << "' skipped");
-        }
-    }
-
-    rewindServerList();
 
     tcpSocket = 0;
     localSocket = 0;
@@ -215,12 +282,18 @@ void CoClient::initialize(const QString& ct, const QList<QUrl>& urls)
     mId = -1;
     name = clientType = ct;
 
-    serverCommand = "coserver4";
-    mAttemptToStartServer = true;
+    QSettings userIni(userClientIni(), QSettings::IniFormat);
+    QSettings systemIni(systemClientIni(), QSettings::IniFormat);
+    serverCommand = value(userIni, systemIni, KEY_SERVER_COMMAND, "coserver4").toString();
+    mAttemptToStartServer = value(userIni, systemIni, KEY_ATTEMPT_START, true).toBool();
 
-    userid = safe_getenv("COSERVER_USER");
+    userid = safe_getenv("COSERVER_USER").trimmed();
+    if (userid.isEmpty())
+        userid = userIni.value(KEY_USER_ID, "").toString();
     if (userid.isEmpty())
         userid = getUserId();
+
+    METLIBS_LOG_DEBUG(LOGVAL(serverCommand) << LOGVAL(userid) << LOGVAL(mAttemptToStartServer));
 }
 
 void CoClient::setUserId(const QString& user)
@@ -352,6 +425,43 @@ bool CoClient::isConnected()
         return (QLocalSocket::ConnectedState == localSocket->state());
     else
         return false;
+}
+
+void CoClient::setServerUrls(const QUrlList& urls)
+{
+    const bool wasConnected = isConnected() || !notConnected();
+    if (wasConnected)
+        disconnectFromServer();
+
+    rewindServerList();
+    serverUrls.clear();
+    for (int i=0; i<urls.size(); ++i) {
+        QUrl u = urls.at(i);
+        bool accept = !u.hasFragment() && !u.hasQuery();
+        if (u.scheme().isEmpty()) {
+            const QString& p = u.path(), h = u.host();
+            if (h.isEmpty() && !p.isEmpty() && !p.contains("/")) {
+                u.setScheme(SCHEME_CO4);
+                u.setHost(p);
+                u.setPath("");
+            } else if (!p.isEmpty()) {
+                u.setScheme(SCHEME_LOCAL);
+            } else {
+                accept = false;
+            }
+        }
+        if (u.scheme() == SCHEME_LOCAL && u.port() != -1)
+            accept = false;
+        if (accept) {
+            METLIBS_LOG_DEBUG("server url '" << u.toString() << "'");
+            serverUrls << u;
+        } else {
+            METLIBS_LOG_WARN("invalid url '" << urls.at(i).toString() << "' skipped");
+        }
+    }
+
+    if (wasConnected)
+        tryReconnectAfterTimeout();
 }
 
 QUrl CoClient::getConnectedServerUrl()

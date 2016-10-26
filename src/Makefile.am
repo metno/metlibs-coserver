@@ -1,6 +1,6 @@
 # $Id: Makefile.am 4334 2013-12-19 14:42:10Z juergens $
 
-pkgname = coserver
+AM_CPPFLAGS = -DPKGCONFDIR='"$(sysconfdir)/@PACKAGE_NAME@"'
 
 lib_LTLIBRARIES = libcoserver.la
 
@@ -30,7 +30,7 @@ nodist_libcoserver_la_SOURCES = $(moc_sources)
 
 libcoserver_la_SOURCES = $(cc_sources) $(qt_sources)
 
-pkg_includedir = ${includedir}/coserver
+pkg_includedir = ${includedir}/@PACKAGE_NAME@
 
 pkg_include_HEADERS = \
 	$(cc_sources:.cc=.h) \
@@ -38,7 +38,7 @@ pkg_include_HEADERS = \
 	coserverVersion.h
 
 
-libcoserver_la_CPPFLAGS = ${MILOGGER_CPPFLAGS} ${QUTILITIES_CPPFLAGS} ${QT4_CPPFLAGS}
+libcoserver_la_CPPFLAGS = ${MILOGGER_CPPFLAGS} ${QUTILITIES_CPPFLAGS} ${QT4_CPPFLAGS} ${AM_CPPFLAGS}
 libcoserver_la_LDFLAGS  = ${VERSION_INFO}
 
 

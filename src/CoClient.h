@@ -45,12 +45,14 @@ class miMessageIO;
 class CoClient : public QObject
 {
     Q_OBJECT
+public:
+    typedef QList<QUrl> QUrlList;
 
 public:
     CoClient(const QString& clientType, QObject* parent=0);
     CoClient(const QString& clientType, const QString& host, quint16 port = 0, QObject* parent = 0);
     CoClient(const QString& clientType, const QUrl& url, QObject* parent = 0);
-    CoClient(const QString& clientType, const QList<QUrl>& urls, QObject* parent = 0);
+    CoClient(const QString& clientType, const QUrlList& urls, QObject* parent = 0);
     ~CoClient();
 
     void setUserId(const QString& user);
@@ -76,11 +78,10 @@ public:
 
     QUrl getConnectedServerUrl();
 
-    void setServerUrls(const QList<QUrl>& urls)
-        { serverUrls = urls; }
+    void setServerUrls(const QUrlList& urls);
 
     void setServerUrl(const QUrl& url)
-        { serverUrls.clear(); serverUrls << url; }
+        { setServerUrls(QUrlList() << url); }
 
     void setServerCommand(const QString& sc)
         { serverCommand = sc; }
@@ -142,7 +143,7 @@ private:
     typedef std::map<int, Client> clients_t;
 
 private:
-    void initialize(const QString& clientType, const QList<QUrl>& urls);
+    void initialize(const QString& clientType);
     void createSocket(const QUrl& serverUrl);
     void createTcpSocket(const QUrl& serverUrl);
     void createLocalSocket(const QUrl& serverUrl);
@@ -183,7 +184,7 @@ private:
     clients_t clients;
 
     QString serverCommand;
-    QList<QUrl> serverUrls;
+    QUrlList serverUrls;
     int serverIndex;
     int serverStarting;
 
