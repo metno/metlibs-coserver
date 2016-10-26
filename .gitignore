@@ -18,6 +18,8 @@ Makefile.in
 /ltmain.sh
 /coserver.pc
 /missing
+/debian/debhelper-build-stamp
+/debian/.debhelper
 /debian/metlibs-coserver-dev.debhelper.log
 /debian/metlibs-coserver-dev.substvars
 /debian/metlibs-coserver-dev
