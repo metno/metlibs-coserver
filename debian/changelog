@@ -1,3 +1,9 @@
+metlibs-qt-coserver (2.3.0-2) unstable; urgency=low
+
+  * revert update of debian/rules
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Thu, 27 Oct 2016 08:00:00 +0200
+
 metlibs-qt-coserver (2.3.0-1) unstable; urgency=low
 
   * configuration via client.ini file
