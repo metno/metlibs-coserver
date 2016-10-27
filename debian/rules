@@ -14,5 +14,7 @@ override_dh_auto_configure:
 	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --prefix=/usr \
 	            --disable-silent-rules \
 	            --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info \
-	            --includedir=\$${prefix}/include/metlibs --disable-shared \
+	            --includedir=\$${prefix}/include/metlibs \
+	            --sysconfdir=/etc \
+	            --disable-shared \
 	            CFLAGS="$(CFLAGS)" LDFLAGS="-Wl,-z,defs"
