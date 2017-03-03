@@ -1,3 +1,11 @@
+metlibs-qt-coserver (3.0.0-1) unstable; urgency=low
+
+  * CMake build
+  * using Qt5
+  * shared library, soversion 3
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Fri, 03 Mar 2017 08:00:08 +0100
+
 metlibs-qt-coserver (2.3.0-3) unstable; urgency=low
 
   * sysconfdir = /etc

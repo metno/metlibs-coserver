@@ -1,20 +1,24 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
 
-DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
-DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-
 DH_COMMAND = dh
+
+V_HEADER_FILE=src/coserverVersion.h
 
 %:
 	$(DH_COMMAND) $@ --parallel
 
-override_dh_auto_configure:
-	./autogen.sh
-	./configure --host=$(DEB_HOST_GNU_TYPE) --build=$(DEB_BUILD_GNU_TYPE) --prefix=/usr \
-	            --disable-silent-rules \
-	            --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info \
-	            --includedir=\$${prefix}/include/metlibs \
-	            --sysconfdir=/etc \
-	            --disable-shared \
-	            CFLAGS="$(CFLAGS)" LDFLAGS="-Wl,-z,defs"
+.PHONY: override_dh_auto_configure version-check
+override_dh_auto_configure: version-check
+	dh_auto_configure
+
+version-check:
+	@ V_MAJOR=`grep '^#define METLIBS_.*_VERSION_MAJOR ' "${V_HEADER_FILE}" | cut -d' ' -f3` ; \
+	V_MINOR=`grep '^#define METLIBS_.*_VERSION_MINOR ' "${V_HEADER_FILE}" | cut -d' ' -f3` ; \
+	V_PATCH=`grep '^#define METLIBS_.*_VERSION_PATCH ' "${V_HEADER_FILE}" | cut -d' ' -f3` ; \
+	head -n1 debian/changelog | grep -q "$${V_MAJOR}\\.$${V_MINOR}\\.$${V_PATCH}-" || \
+	{ echo "version mismatch ${V_HEADER_FILE} vs debian/changelog" ; false ; }
+
+.PHONY: override_dh_strip
+override_dh_strip:
+	dh_strip --dbg-package=libmetlibs-coserver-qt5-3-dbg

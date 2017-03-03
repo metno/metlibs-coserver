@@ -1,9 +1,13 @@
 /debian/debhelper-build-stamp
 /debian/.debhelper
-/debian/metlibs-coserver-dev.debhelper.log
-/debian/metlibs-coserver-dev.substvars
-/debian/metlibs-coserver-dev
+/debian/*.debhelper.log
+/debian/*.substvars
+/debian/libmetlibs-coserver-qt5-*-dbg/
+/debian/libmetlibs-coserver-qt5-*/
+/debian/metlibs-coserver-qt5-dev/
 /debian/files
+/debian/tmp/
+/obj-x86_64-linux-gnu/
 /.settings/
 /.autotools
 /.cproject

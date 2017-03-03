@@ -1,0 +1,3 @@
+usr/include/metlibs/coserver/*
+usr/lib/*/libmetlibs*.so
+usr/lib/*/pkgconfig/*.pc

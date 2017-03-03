@@ -1,17 +1,44 @@
 Source: metlibs-qt-coserver
 Priority: optional
 Maintainer: Alexander Bürger <alexander.buerger@met.no>
-Build-Depends:  debhelper (>= 9),
-  autoconf (>=2.62), automake (>= 1.11), libtool (>= 2.4.2), pkg-config,
-  metlibs-milogger-dev (>= 5.0.0), metlibs-qutilities-dev (>= 5.1.2),
-  libboost-dev, libqt4-dev
-Standards-Version: 3.7.3
+Build-Depends: debhelper (>= 9),
+ cmake,
+ pkg-config,
+ metlibs-milogger-dev (>= 6.0.0),
+ metlibs-qutilities-qt5-dev (>= 8.0.0),
+ qtbase5-dev, qtbase5-dev-tools, qttools5-dev-tools
+Standards-Version: 3.9.2
 Section: libs
 
-Package: metlibs-coserver-dev
+Package: metlibs-coserver-qt5-dev
 Section: libdevel
+Breaks: metlibs-coserver-dev (<< 3.0.0)
+Replaces: metlibs-coserver-dev (<< 3.0.0)
 Architecture: any
-Depends: libqt4-dev, metlibs-qutilities-dev (>= 5.1.2),
+Depends: qtbase5-dev,
+ libmetlibs-coserver-qt5-3 (= ${binary:Version}),
  ${misc:Depends}
-Description: coserver client lib
- metlibs coserver client lib
+Description: MET Norway coserver client
+ MET Norway coserver client communication library.
+ .
+ This package contains the development files.
+
+Package: libmetlibs-coserver-qt5-3
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends},
+ ${misc:Depends}
+Description: MET Norway coserver client
+ MET Norway coserver client communication library.
+ .
+ This package contains the shared library.
+
+Package: libmetlibs-coserver-qt5-3-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Depends: libmetlibs-coserver-qt5-3 (= ${binary:Version})
+Description: MET Norway coserver client
+ MET Norway coserver client communication library.
+ .
+ This package contains the shared library debug symbols.
