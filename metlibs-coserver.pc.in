@@ -1,0 +1,10 @@
+prefix=@pc_prefix@
+libdir=@pc_libdir@
+includedir=@pc_includedir@
+
+Name: @lib_name@
+Description: MET Norway coserver client library
+Version: @COSERVER_PVERSION_FULL@
+Requires: @pc_deps@
+Libs: -L${libdir} @pc_libdirs@ -l@lib_name@
+Cflags: -I${includedir}/metlibs @pc_includedirs@

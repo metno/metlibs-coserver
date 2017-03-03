@@ -192,7 +192,7 @@ CoClient::QUrlList serverUrlsFromEnviroment()
 QString userClientIni()
 {
     QDir dot_coserver = QDir::home();
-    dot_coserver.cd("." PACKAGE_NAME);
+    dot_coserver.cd(".coserver");
     return QFileInfo(dot_coserver, CLIENT_INI).filePath();
 }
 

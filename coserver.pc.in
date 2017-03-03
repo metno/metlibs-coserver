@@ -1,11 +1,4 @@
-prefix=@prefix@
-exec_prefix=@exec_prefix@
-libdir=@libdir@
-includedir=@includedir@
-
 Name: coserver
-Description: The coserver Library
-Version: @VERSION@
-Requires: miLogger >= 5.0.0, qUtilities >= 5.1.2 QtCore, QtGui, QtNetwork
-Libs: -L${libdir} -lcoserver
-Cflags: -I${includedir}
+Description: MET Norway coserver client library
+Version: @COSERVER_PVERSION_FULL@
+Requires: metlibs-coserver@METNO_QT_SUFFIX@ = @COSERVER_PVERSION_FULL@
