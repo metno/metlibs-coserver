@@ -146,8 +146,9 @@ miQMessage& miQMessage::addDataDesc(const QString& desc)
 {
     if (dataRows.isEmpty())
         dataDesc << desc;
-    else
+    else {
         ; // ERROR
+    }
     return *this;
 }
 
@@ -155,8 +156,9 @@ miQMessage& miQMessage::addDataValues(const QStringList& values)
 {
     if (values.count() == dataDesc.count())
         dataRows << values;
-    else
+    else {
         ; // ERROR
+    }
     return *this;
 }
 
