@@ -612,7 +612,7 @@ void CoClient::handleRegisteredClient(const miQMessage& qmsg)
         const int myId = qmsg.getCommonValue(idxMyId).toInt(&idOk);
         if (idOk) {
             mId = myId;
-            METLIBS_LOG_INFO("received my id " << mId);
+            METLIBS_LOG_DEBUG("received my id " << mId);
             Q_EMIT receivedId(mId);
         } else {
             METLIBS_LOG_WARN("could not parse id from '" << qmsg.getCommonValue(idxMyId) << "'");
@@ -633,7 +633,7 @@ void CoClient::handleRegisteredClient(const miQMessage& qmsg)
             clients_t::iterator it = clients.find(pId);
             if (it == clients.end()) {
                 clients.insert(std::make_pair(pId, Client(pType, pName)));
-                METLIBS_LOG_INFO("registered client " << pId << " of type " << pType);
+                METLIBS_LOG_DEBUG("registered client " << pId << " of type " << pType);
                 Q_EMIT clientChange(pId, CLIENT_REGISTERED);
             } else {
                 METLIBS_LOG_WARN("bad registered message for known client " << pId);
@@ -656,7 +656,7 @@ void CoClient::handleUnregisteredClient(const miQMessage& qmsg)
             if (it != clients.end()) {
                 Q_EMIT clientChange(pId, CLIENT_UNREGISTERED);
                 clients.erase(pId);
-                METLIBS_LOG_INFO("unregistered client " << pId);
+                METLIBS_LOG_DEBUG("unregistered client " << pId);
             } else {
                 METLIBS_LOG_WARN("bad unregistered message for client " << pId);
             }
@@ -672,7 +672,7 @@ void CoClient::handleNewClient(const miQMessage& qmsg)
     const int id = qmsg.getCommonValue("id").toInt();
     clients_t::iterator it = clients.find(id);
     if (it != clients.end() && !it->second.connected) {
-        METLIBS_LOG_INFO("connected with client " << id);
+        METLIBS_LOG_DEBUG("connected with client " << id);
         it->second.connected = true;
         Q_EMIT clientChange(id, CLIENT_NEW);
         Q_EMIT newClient(it->second.type);
@@ -691,7 +691,7 @@ void CoClient::handleRemoveClient(const miQMessage& qmsg)
     clients_t::iterator it = clients.find(id);
     if (it != clients.end() && it->second.connected) {
         it->second.connected = false;
-        METLIBS_LOG_INFO("diconnected from client " << id);
+        METLIBS_LOG_DEBUG("diconnected from client " << id);
 
         Q_EMIT clientChange(id, CLIENT_GONE);
         Q_EMIT newClient(std::string("myself"));
@@ -798,7 +798,7 @@ void CoClient::tcpError(QAbstractSocket::SocketError e)
         METLIBS_LOG_INFO("connection to tcp coserver closed unexpectedly");
         tryReconnectAfterTimeout();
     } else {
-        METLIBS_LOG_INFO("error when contacting tcp coserver: " << e);
+        METLIBS_LOG_WARN("error when contacting tcp coserver: " << e);
         tryConnectNextServer();
     }
 }
@@ -813,7 +813,7 @@ void CoClient::localError(QLocalSocket::LocalSocketError e)
         METLIBS_LOG_INFO("connection to local coserver closed unexpectedly");
         tryReconnectAfterTimeout();
     } else {
-        METLIBS_LOG_INFO("error when contacting local coserver: " << e);
+        METLIBS_LOG_WARN("error when contacting local coserver: " << e);
         tryConnectNextServer();
     }
 }
