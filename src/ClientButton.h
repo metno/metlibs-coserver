@@ -1,6 +1,6 @@
 // -*- c++ -*-
 /** @file ClientButton.h
- * @author Martin Lilleeng S�tra <martinls@met.no>
+ * @author Martin Lilleeng Sætra <martinls@met.no>
  *
  * qUtilities - coserver client file
  *

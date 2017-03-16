@@ -1,6 +1,6 @@
 // -*- c++ -*-
 /** @mainpage qUtilities - coserver client file
- * @author Martin Lilleeng Sætra <martinls@met.no>
+ * @author Martin Lilleeng SÃ¦tra <martinls@met.no>
  *
  * Copyright (C) 2013 met.no
  *

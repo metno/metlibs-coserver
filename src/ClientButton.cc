@@ -1,6 +1,6 @@
 /**
  * coclient - coserver client file
- * @author Martin Lilleeng S�tra <martinls@met.no>
+ * @author Martin Lilleeng Sætra <martinls@met.no>
  *
  * Copyright (C) 2013 met.no
  *
