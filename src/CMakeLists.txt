@@ -6,6 +6,9 @@ INCLUDE_DIRECTORIES(${PC_METLIBS_INCLUDE_DIRS})
 ADD_DEFINITIONS(-DQT_NO_KEYWORDS -W -Wall ${PC_METLIBS_CFLAGS_OTHER})
 LINK_DIRECTORIES(${PC_METLIBS_LIBRARY_DIRS})
 
+SET (COSERVER_CONF_DIR "${CMAKE_INSTALL_FULL_SYSCONFDIR}/coserver" CACHE STRING "coserver configuration directory, e.g. for client.ini")
+ADD_DEFINITIONS(-DPKGCONFDIR="${COSERVER_CONF_DIR}")
+
 ########################################################################
 
 SET(coserver_SOURCES
