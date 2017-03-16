@@ -1,3 +1,9 @@
+metlibs-qt-coserver (3.0.1-1) unstable; urgency=low
+
+  * bugfix system configuration directory
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Thu, 15 Mar 2017 08:00:08 +0100
+
 metlibs-qt-coserver (3.0.0-1) unstable; urgency=low
 
   * CMake build
