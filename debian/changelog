@@ -1,3 +1,9 @@
+metlibs-qt-coserver (3.0.2-1) unstable; urgency=low
+
+  * do not require Qt5 linguist tools
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Thu, 01 Nov 2018 08:00:08 +0100
+
 metlibs-qt-coserver (3.0.1-2) unstable; urgency=low
 
   * version number in shlibs
