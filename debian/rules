@@ -17,7 +17,10 @@ version-check:
 	V_MINOR=`grep '^#define METLIBS_.*_VERSION_MINOR ' "${V_HEADER_FILE}" | cut -d' ' -f3` ; \
 	V_PATCH=`grep '^#define METLIBS_.*_VERSION_PATCH ' "${V_HEADER_FILE}" | cut -d' ' -f3` ; \
 	head -n1 debian/changelog | grep -q "$${V_MAJOR}\\.$${V_MINOR}\\.$${V_PATCH}-" || \
-	{ echo "version mismatch ${V_HEADER_FILE} vs debian/changelog" ; false ; }
+	{ echo "version mismatch ${V_HEADER_FILE} vs debian/changelog" ; false ; } ; \
+	PKG="libmetlibs-coserver-qt5-" ; \
+	if grep "$${PKG}[0-9]\\+" debian/control | grep -v "$${PKG}$${V_MAJOR}\\( \\|-\\|$$\\)" ; then \
+	echo "so version mismatch ${V_HEADER_FILE} vs debian/control" ; false ; else echo "so version ok" ; fi
 
 .PHONY: override_dh_strip
 override_dh_strip:
