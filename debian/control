@@ -2,7 +2,7 @@ Source: metlibs-qt-coserver
 Priority: optional
 Maintainer: Alexander Bürger <alexander.buerger@met.no>
 Build-Depends: debhelper (>= 11),
- cmake,
+ cmake (>= 3.10),
  pkg-config,
  metlibs-milogger-dev (>= 6.0.0),
  metlibs-qutilities-qt5-dev (>= 8.0.0),
