@@ -1,3 +1,10 @@
+metlibs-qt-coserver (3.0.3-1) unstable; urgency=low
+
+  * update debhelper compat to 11
+  * require cmake 3.10
+
+ -- Alexander Bürger <alexander.buerger@met.no>  Thu, 14 Jul 2022 08:00:08 +0200
+
 metlibs-qt-coserver (3.0.2-1) unstable; urgency=low
 
   * do not require Qt5 linguist tools

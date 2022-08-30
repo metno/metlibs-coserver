@@ -28,11 +28,8 @@
 
 // Qt-includes
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #include "ClientButton.h"
+
 #include "CoClient.h"
 #include "miMessage.h"
 
